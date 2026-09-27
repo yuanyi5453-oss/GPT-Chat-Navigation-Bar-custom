@@ -1,0 +1,29 @@
+{
+  "name": "gpt-chat-navigator-extension",
+  "version": "2026.10.4",
+  "private": true,
+  "type": "module",
+  "description": "GPT页面增强工具：本地增强 ChatGPT 专注阅读、选择性导出、引用管理、排版与素材工具。",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "package": "npm run build && powershell -ExecutionPolicy Bypass -File scripts/package.ps1"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.268",
+    "@types/react": "^18.2.79",
+    "@types/react-dom": "^18.2.25",
+    "@types/jsdom": "^21.1.7",
+    "esbuild": "^0.28.1",
+    "jsdom": "^26.1.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

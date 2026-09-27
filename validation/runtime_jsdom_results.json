@@ -1,0 +1,292 @@
+{
+  "passed": true,
+  "assertions": [
+    {
+      "name": "main_form_marks_visual_shell",
+      "pass": true,
+      "detail": {
+        "case": "main_form",
+        "targets": [
+          "visual-shell"
+        ],
+        "ancestors": [
+          "composer-zone",
+          "native-limit"
+        ],
+        "base": "720.00px",
+        "flag": "true"
+      }
+    },
+    {
+      "name": "main_form_excludes_canvas_and_messages",
+      "pass": true,
+      "detail": {
+        "case": "main_form",
+        "targets": [
+          "visual-shell"
+        ],
+        "ancestors": [
+          "composer-zone",
+          "native-limit"
+        ],
+        "base": "720.00px",
+        "flag": "true"
+      }
+    },
+    {
+      "name": "outside_main_form_marks_visual_shell",
+      "pass": true,
+      "detail": {
+        "case": "outside_main_form",
+        "targets": [
+          "visual-shell"
+        ],
+        "ancestors": [
+          "composer-zone",
+          "native-limit"
+        ],
+        "base": "720.00px",
+        "flag": "true"
+      }
+    },
+    {
+      "name": "outside_main_form_excludes_canvas_and_messages",
+      "pass": true,
+      "detail": {
+        "case": "outside_main_form",
+        "targets": [
+          "visual-shell"
+        ],
+        "ancestors": [
+          "composer-zone",
+          "native-limit"
+        ],
+        "base": "720.00px",
+        "flag": "true"
+      }
+    },
+    {
+      "name": "outside_main_without_form_marks_visual_shell",
+      "pass": true,
+      "detail": {
+        "case": "outside_main_without_form",
+        "targets": [
+          "visual-shell"
+        ],
+        "ancestors": [
+          "composer-zone",
+          "native-limit"
+        ],
+        "base": "720.00px",
+        "flag": "true"
+      }
+    },
+    {
+      "name": "outside_main_without_form_excludes_canvas_and_messages",
+      "pass": true,
+      "detail": {
+        "case": "outside_main_without_form",
+        "targets": [
+          "visual-shell"
+        ],
+        "ancestors": [
+          "composer-zone",
+          "native-limit"
+        ],
+        "base": "720.00px",
+        "flag": "true"
+      }
+    },
+    {
+      "name": "form_with_inner_visual_shell_marks_visual_shell",
+      "pass": true,
+      "detail": {
+        "case": "form_with_inner_visual_shell",
+        "targets": [
+          "visual-shell"
+        ],
+        "ancestors": [
+          "composer-zone",
+          "native-limit",
+          "FORM"
+        ],
+        "base": "720.00px",
+        "flag": "true"
+      }
+    },
+    {
+      "name": "form_with_inner_visual_shell_excludes_canvas_and_messages",
+      "pass": true,
+      "detail": {
+        "case": "form_with_inner_visual_shell",
+        "targets": [
+          "visual-shell"
+        ],
+        "ancestors": [
+          "composer-zone",
+          "native-limit",
+          "FORM"
+        ],
+        "base": "720.00px",
+        "flag": "true"
+      }
+    },
+    {
+      "name": "unified_editor_without_prompt_id_marks_visual_shell",
+      "pass": true,
+      "detail": {
+        "case": "unified_editor_without_prompt_id",
+        "targets": [
+          "visual-shell"
+        ],
+        "ancestors": [
+          "composer-zone",
+          "native-limit"
+        ],
+        "base": "720.00px",
+        "flag": "true"
+      }
+    },
+    {
+      "name": "unified_editor_without_prompt_id_excludes_canvas_and_messages",
+      "pass": true,
+      "detail": {
+        "case": "unified_editor_without_prompt_id",
+        "targets": [
+          "visual-shell"
+        ],
+        "ancestors": [
+          "composer-zone",
+          "native-limit"
+        ],
+        "base": "720.00px",
+        "flag": "true"
+      }
+    },
+    {
+      "name": "attachment_role_document_marks_visual_shell",
+      "pass": true,
+      "detail": {
+        "case": "attachment_role_document",
+        "targets": [
+          "visual-shell"
+        ],
+        "ancestors": [
+          "composer-zone",
+          "native-limit"
+        ],
+        "base": "720.00px",
+        "flag": "true"
+      }
+    },
+    {
+      "name": "attachment_role_document_excludes_canvas_and_messages",
+      "pass": true,
+      "detail": {
+        "case": "attachment_role_document",
+        "targets": [
+          "visual-shell"
+        ],
+        "ancestors": [
+          "composer-zone",
+          "native-limit"
+        ],
+        "base": "720.00px",
+        "flag": "true"
+      }
+    },
+    {
+      "name": "default_100_restores_native_state",
+      "pass": true,
+      "detail": {
+        "flag": null
+      }
+    },
+    {
+      "name": "no_runtime_or_network_errors",
+      "pass": true,
+      "detail": {
+        "errors": [],
+        "warnings": [],
+        "network": []
+      }
+    }
+  ],
+  "states": [
+    {
+      "case": "main_form",
+      "targets": [
+        "visual-shell"
+      ],
+      "ancestors": [
+        "composer-zone",
+        "native-limit"
+      ],
+      "base": "720.00px",
+      "flag": "true"
+    },
+    {
+      "case": "outside_main_form",
+      "targets": [
+        "visual-shell"
+      ],
+      "ancestors": [
+        "composer-zone",
+        "native-limit"
+      ],
+      "base": "720.00px",
+      "flag": "true"
+    },
+    {
+      "case": "outside_main_without_form",
+      "targets": [
+        "visual-shell"
+      ],
+      "ancestors": [
+        "composer-zone",
+        "native-limit"
+      ],
+      "base": "720.00px",
+      "flag": "true"
+    },
+    {
+      "case": "form_with_inner_visual_shell",
+      "targets": [
+        "visual-shell"
+      ],
+      "ancestors": [
+        "composer-zone",
+        "native-limit",
+        "FORM"
+      ],
+      "base": "720.00px",
+      "flag": "true"
+    },
+    {
+      "case": "unified_editor_without_prompt_id",
+      "targets": [
+        "visual-shell"
+      ],
+      "ancestors": [
+        "composer-zone",
+        "native-limit"
+      ],
+      "base": "720.00px",
+      "flag": "true"
+    },
+    {
+      "case": "attachment_role_document",
+      "targets": [
+        "visual-shell"
+      ],
+      "ancestors": [
+        "composer-zone",
+        "native-limit"
+      ],
+      "base": "720.00px",
+      "flag": "true"
+    }
+  ],
+  "errors": [],
+  "warnings": []
+}

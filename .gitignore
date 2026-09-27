@@ -1,0 +1,10 @@
+node_modules/
+dist/
+release/
+tmp/
+*.log
+validation/**/profile*/
+validation/**/temp/
+validation/**/home/
+validation/**/appdata/
+validation/**/localappdata/

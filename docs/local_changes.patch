@@ -1,0 +1,1326 @@
+--- a/src/composerLayout.ts
++++ b/src/composerLayout.ts
+@@ -0,0 +1,111 @@
++import { CHATGPT_MESSAGE_NODE_SELECTOR } from "./chatGptAdapter";
++
++export const COMPOSER_EDITOR_SELECTOR = '#prompt-textarea, form[data-type="unified-composer"] :is(textarea,[contenteditable="true"]), [data-testid*="composer" i] :is(textarea,[contenteditable="true"])';
++const EXCLUDED = '#conversation-navigator-root,[data-cnav-canvas-root],[data-cnav-canvas-kind],[data-testid*="canvas" i],[data-testid*="artifact" i]';
++const TARGET = "data-cnav-composer-width-target";
++const ANCESTOR = "data-cnav-composer-width-ancestor";
++const MESSAGES = `${CHATGPT_MESSAGE_NODE_SELECTOR},[data-cnav-message-role],[data-testid*="conversation-turn" i]`;
++
++export const COMPOSER_WIDTH_CSS = `
++  html[data-cnav-composer-width="true"] [${ANCESTOR}="true"] {
++    box-sizing: border-box !important;
++    width: 100% !important;
++    max-width: none !important;
++    min-width: 0 !important;
++  }
++  html[data-cnav-composer-width="true"] [${TARGET}="true"] {
++    box-sizing: border-box !important;
++    width: min(calc(var(--cnav-composer-base-width) * var(--cnav-composer-scale)), 100%) !important;
++    max-width: calc(var(--cnav-composer-base-width) * var(--cnav-composer-scale)) !important;
++    min-width: 0 !important;
++    flex-grow: 0 !important;
++    flex-shrink: 1 !important;
++    flex-basis: auto !important;
++    margin-inline: auto !important;
++  }
++`;
++
++function isShared(element: HTMLElement) {
++  return element.matches("body,html,main,nav,aside") || element.matches(MESSAGES) || Boolean(element.querySelector(MESSAGES));
++}
++
++function isVisible(element: HTMLElement) {
++  const style = window.getComputedStyle(element);
++  return !element.closest('[hidden],[aria-hidden="true"]') && style.display !== "none" &&
++    style.visibility !== "hidden" && element.getBoundingClientRect().width > 0;
++}
++
++/** 从编辑器寻找可见输入框外壳，不依赖 main/form 或 Tailwind 类名。 */
++export function findComposerLayout() {
++  const editor = Array.from(document.querySelectorAll<HTMLElement>(COMPOSER_EDITOR_SELECTOR))
++    .find((candidate) => !candidate.closest(EXCLUDED) && !candidate.closest(MESSAGES) && isVisible(candidate));
++  if (!editor) return null;
++
++  const form = editor.closest<HTMLElement>("form");
++  let target: HTMLElement | null = null;
++  let controlsFallback: HTMLElement | null = null;
++  let namedFallback: HTMLElement | null = null;
++  let paintedFallback: HTMLElement | null = null;
++  for (let element = editor.parentElement, count = 0; element && count < 10; element = element.parentElement, count++) {
++    if (isShared(element) || element.matches(EXCLUDED)) break;
++    if (element.matches('[data-testid*="composer" i]')) namedFallback ??= element;
++    const hasControls = Boolean(element.querySelector('button,[role="button"],input[type="submit"]'));
++    if (hasControls) controlsFallback ??= element;
++    const style = window.getComputedStyle(element);
++    const rounded = Number.parseFloat(style.borderTopLeftRadius || style.borderRadius) >= 10;
++    const painted = (style.backgroundColor && !["transparent", "rgba(0, 0, 0, 0)"].includes(style.backgroundColor)) ||
++      Number.parseFloat(style.borderTopWidth) > 0 || (style.boxShadow && style.boxShadow !== "none");
++    if (rounded && painted) paintedFallback ??= element;
++    if (element.matches('[data-testid="composer-background"],[data-testid="composer-surface"]') || (rounded && painted && hasControls)) {
++      target = element;
++      break;
++    }
++    if (element === form) break;
++  }
++  target ??= paintedFallback ?? (form && !isShared(form) ? form : controlsFallback ?? namedFallback);
++  target ??= editor.parentElement && !isShared(editor.parentElement) ? editor.parentElement : editor;
++  if (!isVisible(target)) return null;
++
++  const ancestors: HTMLElement[] = [];
++  let host = target.parentElement;
++  for (let element = target.parentElement, count = 0; element && count < 10; element = element.parentElement, count++) {
++    host = element;
++    if (isShared(element) || element.matches(EXCLUDED) || element.querySelector('nav,aside,[data-testid*="sidebar" i]')) break;
++    // 一个祖先包含其他输入区时，保留其整体布局。
++    if (Array.from(element.querySelectorAll(COMPOSER_EDITOR_SELECTOR)).some((other) => other !== editor)) break;
++    ancestors.push(element);
++  }
++  return { editor, target, ancestors, host };
++}
++
++export function clearComposerWidth() {
++  const root = document.documentElement;
++  delete root.dataset.cnavComposerWidth;
++  document.querySelectorAll(`[${TARGET}],[${ANCESTOR}]`).forEach((element) => {
++    element.removeAttribute(TARGET);
++    element.removeAttribute(ANCESTOR);
++  });
++  root.style.removeProperty("--cnav-composer-base-width");
++  delete root.dataset.cnavComposerStatus;
++}
++
++export function applyComposerWidth(scale: number): HTMLElement | null {
++  clearComposerWidth();
++  const root = document.documentElement;
++  root.style.setProperty("--cnav-composer-scale", (scale / 100).toFixed(2));
++  if (scale === 100) return null;
++
++  const layout = findComposerLayout();
++  if (!layout) {
++    root.dataset.cnavComposerStatus = "not-found";
++    return null;
++  }
++  // 暂时撤销自定义样式后测量，避免重复缩放和默认宽度跳变。
++  const width = layout.target.getBoundingClientRect().width;
++  root.style.setProperty("--cnav-composer-base-width", `${width.toFixed(2)}px`);
++  layout.target.setAttribute(TARGET, "true");
++  layout.ancestors.forEach((element) => element.setAttribute(ANCESTOR, "true"));
++  root.dataset.cnavComposerWidth = "true";
++  root.dataset.cnavComposerStatus = "applied";
++  return layout.host;
++}
+--- a/src/contentScript.tsx
++++ b/src/contentScript.tsx
+@@ -59,6 +59,9 @@
+   normalizeSettings
+ } from "./shared";
+ import { getTranslation } from "./i18n";
++import { getThreadContentBounds } from "./threadLayout";
++import { buildQuestionTitle } from "./questionTitle";
++import { applyComposerWidth, COMPOSER_EDITOR_SELECTOR, COMPOSER_WIDTH_CSS } from "./composerLayout";
+ import {
+   buildConversationStorageKey,
+   buildConversationSessionId,
+@@ -118,7 +121,7 @@
+ const STREAMING_SCAN_DEBOUNCE_MS = 1400;
+ const IDLE_SCAN_TIMEOUT_MS = 1200;
+ const CHAT_STYLE_ID = "conversation-navigator-chat-style";
+-const CHAT_STYLE_VERSION = "2026-07-v10-reading-tools-v1";
++const CHAT_STYLE_VERSION = "2026-10-v10-composer-width-v4";
+ const TABLE_COPY_FORMAT_STORAGE_KEY = "conversationNavigator:tableCopyFormat:v1";
+ const PAGE_COMMAND_EVENT = "conversation-navigator-page-command";
+ const FOCUS_ACTIVE_ATTR = "data-cnav-focus-active";
+@@ -181,6 +184,8 @@
+ interface NavigatorItem {
+   id: string;
+   promptPreview: string;
++  promptText: string;
++  questionTitle: string;
+   answerSummary: string;
+   turnIndex: number;
+   domOrder: number;
+@@ -257,6 +262,7 @@
+ let activeCompatRules: ChatGptDomRule[] = [];
+ let activeCompatRulesSource: CompatRulesSource = "built-in";
+ let navigationAnimationFrame = 0;
++let navigationGeneration = 0;
+ let latestPageHealth: PageAdapterHealth | null = null;
+ let latestNavigatorExportState: {
+   items: NavigatorItem[];
+@@ -593,6 +599,8 @@
+   }
+ 
+   style.textContent = `
++    ${COMPOSER_WIDTH_CSS}
++
+     html[data-cnav-wide-thread="true"] main {
+       --thread-content-max-width: var(--cnav-thread-width) !important;
+       --thread-content-width: var(--cnav-thread-width) !important;
+@@ -1749,6 +1757,8 @@
+     items.push({
+       id,
+       promptPreview: compactPreview(message.text, 112),
++      promptText: message.text,
++      questionTitle: buildQuestionTitle(message.text),
+       answerSummary: summarizeAnswer(answerParts.join("\n\n")),
+       turnIndex: items.length + 1,
+       domOrder,
+@@ -2120,6 +2130,7 @@
+ }
+ 
+ function cancelNavigationAnimation() {
++  navigationGeneration += 1;
+   if (!navigationAnimationFrame) {
+     return;
+   }
+@@ -2197,6 +2208,7 @@
+ }
+ 
+ function setCurrentConversationScrollTop(top: number) {
++  cancelNavigationAnimation();
+   const scrollContainer = getPrimaryConversationScrollContainer();
+   if (scrollContainer === window) window.scrollTo({ top, behavior: "auto" });
+   else (scrollContainer as HTMLElement).scrollTo({ top, behavior: "auto" });
+@@ -2220,8 +2232,16 @@
+   }
+ }
+ 
++function scheduleNavigationCheck(check: () => void, delay: number) {
++  const generation = navigationGeneration;
++  window.setTimeout(() => {
++    if (generation === navigationGeneration) check();
++  }, delay);
++}
++
+ function verifyJump(element: HTMLElement, scrollContainer: HTMLElement | Window, delay = 80) {
+-  window.setTimeout(() => {
++  scheduleNavigationCheck(() => {
++    if (!element.isConnected) return;
+     const activeScrollContainer = document.body.contains(element) ? getScrollContainer(element) : scrollContainer;
+     const rect = element.getBoundingClientRect();
+     const viewport = getContainerViewportRect(activeScrollContainer);
+@@ -2235,7 +2255,7 @@
+     if (activeScrollContainer === window) {
+       const top = Math.max(0, window.scrollY + rect.top - topLimit);
+       scrollWindowTo(top, false);
+-      window.setTimeout(() => {
++      scheduleNavigationCheck(() => {
+         if (!isElementVisibleInContainer(element, getScrollContainer(element))) {
+           scrollElementIntoView(element, false);
+         }
+@@ -2247,7 +2267,7 @@
+     const containerRect = scrollElement.getBoundingClientRect();
+     const top = Math.max(0, scrollElement.scrollTop + rect.top - containerRect.top - 16);
+     scrollElementTo(scrollElement, top, false);
+-    window.setTimeout(() => {
++    scheduleNavigationCheck(() => {
+       if (!isElementVisibleInContainer(element, getScrollContainer(element))) {
+         scrollElementIntoView(element, false);
+       }
+@@ -4849,6 +4869,10 @@
+       title: "Reading tools",
+       close: "Close reading tools",
+       focus: "Focus",
++      questions: "Questions",
++      navigationDescription: "Jump to a question while keeping the full conversation visible.",
++      optionalFocus: "Focus mode (optional)",
++      goToQuestion: "Go to question",
+       export: "Select export",
+       citations: "Sources",
+       enterFocus: "Enter focus mode",
+@@ -4893,6 +4917,10 @@
+       title: "閱讀工具",
+       close: "關閉閱讀工具",
+       focus: "專注閱讀",
++      questions: "問題目錄",
++      navigationDescription: "點擊跳到原問題，保留全部問答。",
++      optionalFocus: "專注閱讀（可選）",
++      goToQuestion: "跳到問題",
+       export: "選擇匯出",
+       citations: "引用管理",
+       enterFocus: "進入專注閱讀",
+@@ -4936,6 +4964,10 @@
+     title: "阅读工具",
+     close: "关闭阅读工具",
+     focus: "专注阅读",
++    questions: "问题目录",
++    navigationDescription: "点击跳到原问题，保留全部问答。",
++    optionalFocus: "专注阅读（可选）",
++    goToQuestion: "跳到问题",
+     export: "选择导出",
+     citations: "引用管理",
+     enterFocus: "进入专注阅读",
+@@ -5013,6 +5045,7 @@
+   onPanelChange: (panel: ReadingToolPanel) => void;
+   onToggleFocus: () => void;
+   onChangeTurn: (index: number) => void;
++  onNavigateTurn: (index: number) => void;
+   onSelectAll: (selected: boolean) => void;
+   onSelectRole: (role: "user" | "assistant") => void;
+   onToggleMessage: (messageId: string) => void;
+@@ -5043,6 +5076,7 @@
+   onPanelChange,
+   onToggleFocus,
+   onChangeTurn,
++  onNavigateTurn,
+   onSelectAll,
+   onSelectRole,
+   onToggleMessage,
+@@ -5105,7 +5139,7 @@
+   ).length;
+ 
+   const panelTabs: Array<{ id: ReadingToolPanel; label: string; icon: React.ReactNode }> = [
+-    { id: "focus", label: labels.focus, icon: <Focus size={16} aria-hidden="true" /> },
++    { id: "focus", label: labels.questions, icon: <BookOpen size={16} aria-hidden="true" /> },
+     { id: "export", label: labels.export, icon: <ListChecks size={16} aria-hidden="true" /> },
+     { id: "citations", label: labels.citations, icon: <Link2 size={16} aria-hidden="true" /> }
+   ];
+@@ -5119,7 +5153,7 @@
+     >
+       <header className="cnav-reading-header">
+         <span className="cnav-reading-mark"><BookOpen size={18} aria-hidden="true" /></span>
+-        <div><strong>{labels.title}</strong><small>2026-V10</small></div>
++        <div><strong>{labels.title}</strong><small>2026-V10 · 2026.10.4</small></div>
+         <button type="button" onClick={onClose} aria-label={labels.close} title={labels.close}><X size={18} aria-hidden="true" /></button>
+       </header>
+       <nav className="cnav-reading-tabs" aria-label={labels.title}>
+@@ -5139,9 +5173,12 @@
+         {panel === "focus" ? (
+           <section className="cnav-tool-panel cnav-focus-panel">
+             <div className="cnav-tool-hero">
+-              <span><Focus size={20} aria-hidden="true" /></span>
+-              <div><strong>{labels.focus}</strong><p>{labels.focusDescription}</p></div>
++              <span><BookOpen size={20} aria-hidden="true" /></span>
++              <div><strong>{labels.questions}</strong><p>{labels.navigationDescription}</p></div>
+             </div>
++            <details className="cnav-focus-options" open={focusMode}>
++              <summary>{labels.optionalFocus}</summary>
++              <p>{labels.focusDescription}</p>
+             <button className={`cnav-primary-action${focusMode ? " is-danger" : ""}`} type="button" onClick={onToggleFocus}>
+               {focusMode ? <Minimize2 size={17} aria-hidden="true" /> : <Focus size={17} aria-hidden="true" />}
+               {focusMode ? labels.exitFocus : labels.enterFocus}
+@@ -5163,16 +5200,19 @@
+                 </div>
+               </>
+             ) : null}
++            </details>
+             <div className="cnav-turn-list">
+               {items.length === 0 ? <p className="cnav-tool-empty">{labels.noContent}</p> : items.map((item, index) => (
+                 <button
+                   type="button"
+                   className={activeTurnIndex === index ? "is-active" : ""}
+-                  onClick={() => onChangeTurn(index)}
++                  onClick={() => onNavigateTurn(index)}
++                  title={item.promptText}
++                  aria-label={`${labels.goToQuestion} ${index + 1}: ${item.questionTitle}`}
+                   key={item.id}
+                 >
+                   <small>{labels.turn} {index + 1}</small>
+-                  <span>{item.promptPreview}</span>
++                  <span>{item.questionTitle}</span>
+                 </button>
+               ))}
+             </div>
+@@ -5403,6 +5443,8 @@
+   const forceDomRebuildOnNextScanRef = useRef(true);
+   const focusScrollPositionsRef = useRef<Map<number, number>>(new Map());
+   const focusPresentedTurnRef = useRef<number | null>(null);
++  const focusScrollFrameRef = useRef(0);
++  const questionNavigationFrameRef = useRef(0);
+   const readingSnapshotCacheRef = useRef<ReadingMessageParseCache>(new Map());
+   const citationStateRef = useRef(citationState);
+   const citationRequestGenerationRef = useRef(0);
+@@ -5486,6 +5528,9 @@
+     anchorRegistry.clear();
+     focusScrollPositionsRef.current.clear();
+     focusPresentedTurnRef.current = null;
++    window.cancelAnimationFrame(focusScrollFrameRef.current);
++    window.cancelAnimationFrame(questionNavigationFrameRef.current);
++    cancelNavigationAnimation();
+     readingSnapshotCacheRef.current.clear();
+     citationRequestGenerationRef.current += 1;
+     citationStateRef.current = {};
+@@ -5593,8 +5638,36 @@
+   };
+   const updateSettings = commitSettingsPatch;
+ 
++  const navigateToQuestion = (nextIndex: number) => {
++    if (items.length === 0) return;
++    const index = Math.min(items.length - 1, Math.max(0, nextIndex));
++    const itemId = items[index].id;
++    const sessionId = sessionIdRef.current;
++    if (focusMode) focusScrollPositionsRef.current.set(activeFocusTurn, getCurrentConversationScrollTop());
++    window.cancelAnimationFrame(focusScrollFrameRef.current);
++    window.cancelAnimationFrame(questionNavigationFrameRef.current);
++    cancelNavigationAnimation();
++    setFocusMode(false);
++    focusPresentedTurnRef.current = null;
++    clearFocusPresentation();
++    setActiveFocusTurn(index);
++    setDrawerOpen(true);
++    setActiveToolPanel("focus");
++    questionNavigationFrameRef.current = window.requestAnimationFrame(() => {
++      questionNavigationFrameRef.current = 0;
++      if (sessionId !== sessionIdRef.current) return;
++      const anchor = anchorRegistry.get(itemId);
++      if (!anchor?.isConnected) return;
++      const animate = settings.navigateAnimationEnabled && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
++      scrollAnchorToTop(anchor, animate);
++      flashAnchor(anchor);
++    });
++  };
++
+   const setFocusTurn = (nextIndex: number) => {
+     if (items.length === 0) return;
++    window.cancelAnimationFrame(questionNavigationFrameRef.current);
++    cancelNavigationAnimation();
+     if (focusMode) focusScrollPositionsRef.current.set(activeFocusTurn, getCurrentConversationScrollTop());
+     const index = Math.min(items.length - 1, Math.max(0, nextIndex));
+     setActiveFocusTurn(index);
+@@ -5604,6 +5677,9 @@
+   };
+ 
+   const toggleFocusMode = () => {
++    window.cancelAnimationFrame(questionNavigationFrameRef.current);
++    window.cancelAnimationFrame(focusScrollFrameRef.current);
++    cancelNavigationAnimation();
+     if (!focusMode && items.length > 0) {
+       const viewportTarget = Math.max(96, window.innerHeight * 0.32);
+       let nextIndex = items.findIndex((item) => {
+@@ -5866,7 +5942,6 @@
+     }
+     const activeTurn = Math.min(items.length - 1, Math.max(0, activeFocusTurn)) + 1;
+     const shouldRestorePosition = focusPresentedTurnRef.current !== activeFocusTurn;
+-    focusPresentedTurnRef.current = activeFocusTurn;
+     document.documentElement.setAttribute("data-cnav-focus-mode", "true");
+     if (settings.focusHideChrome) {
+       markFocusChromeElements();
+@@ -5888,13 +5963,28 @@
+     }
+     const activeAnchor = anchorRegistry.get(items[activeTurn - 1]?.id);
+     const savedPosition = focusScrollPositionsRef.current.get(activeFocusTurn);
+-    if (activeAnchor && shouldRestorePosition) window.requestAnimationFrame(() => {
+-      if (savedPosition !== undefined) setCurrentConversationScrollTop(savedPosition);
+-      else scrollAnchorToTop(activeAnchor, settings.navigateAnimationEnabled);
+-    });
++    if (activeAnchor && shouldRestorePosition) {
++      const frame = window.requestAnimationFrame(() => {
++        focusScrollFrameRef.current = 0;
++        if (!activeAnchor.isConnected || !document.documentElement.hasAttribute("data-cnav-focus-mode")) return;
++        focusPresentedTurnRef.current = activeFocusTurn;
++        if (savedPosition !== undefined) setCurrentConversationScrollTop(savedPosition);
++        else scrollAnchorToTop(activeAnchor, settings.navigateAnimationEnabled);
++      });
++      focusScrollFrameRef.current = frame;
++      return () => {
++        window.cancelAnimationFrame(frame);
++        if (focusScrollFrameRef.current === frame) focusScrollFrameRef.current = 0;
++      };
++    }
+   }, [activeFocusTurn, focusMode, items, mapEntries, settings.focusCollapseOtherTurns, settings.focusHideChrome, settings.navigateAnimationEnabled]);
+ 
+-  useEffect(() => clearFocusPresentation, []);
++  useEffect(() => () => {
++    clearFocusPresentation();
++    window.cancelAnimationFrame(focusScrollFrameRef.current);
++    window.cancelAnimationFrame(questionNavigationFrameRef.current);
++    cancelNavigationAnimation();
++  }, []);
+ 
+   useEffect(() => {
+     if (!focusMode) {
+@@ -6248,13 +6338,13 @@
+     }
+ 
+     const main = document.querySelector<HTMLElement>("main");
+-    const rect = main?.getBoundingClientRect();
+-    const leftBound = Math.max(0, rect?.left ?? 0);
+-    const rightBound = Math.min(window.innerWidth, rect?.right ?? window.innerWidth);
+-    const availableWidth = Math.max(340, rightBound - leftBound - 24);
++    const bounds = getThreadContentBounds(main);
++    const leftBound = bounds.left;
++    const rightBound = bounds.right;
++    const availableWidth = Math.max(0, rightBound - leftBound - 24);
+     const width = Math.min(getThreadWidthPixels(settingsRef.current.chatContentWidth), availableWidth);
+     const center = leftBound + (rightBound - leftBound) / 2;
+-    const top = Math.max(112, (rect?.top ?? 0) + 28);
++    const top = Math.max(112, bounds.top + 28);
+     const bottomGap = 112;
+ 
+     const nextFrame = {
+@@ -6331,6 +6421,58 @@
+     settings.chatContentWidth,
+     updateResizeFrame
+   ]);
++
++  useEffect(() => {
++    if (settings.composerWidthScale === 100) {
++      applyComposerWidth(100);
++      return;
++    }
++
++    let frame = 0;
++    let observedHost: HTMLElement | null = null;
++    let observedWidth = -1;
++    const scheduleUpdate = () => {
++      if (!frame) frame = window.requestAnimationFrame(update);
++    };
++    const resizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver((entries) => {
++      const width = entries[0]?.contentRect.width;
++      if (width !== undefined && width !== observedWidth) {
++        observedWidth = width;
++        scheduleUpdate();
++      }
++    }) : null;
++    const update = () => {
++      frame = 0;
++      const host = applyComposerWidth(settings.composerWidthScale);
++      if (host !== observedHost) {
++        resizeObserver?.disconnect();
++        observedHost = host;
++        observedWidth = -1;
++        if (host) resizeObserver?.observe(host);
++      }
++    };
++    const observer = new MutationObserver((mutations) => {
++      if (mutations.some((mutation) => [
++        ...mutation.addedNodes, ...mutation.removedNodes,
++        ...(mutation.type === "attributes" ? [mutation.target] : [])
++      ].some((node) =>
++        node instanceof HTMLElement && (node.matches(COMPOSER_EDITOR_SELECTOR) || Boolean(node.querySelector(COMPOSER_EDITOR_SELECTOR)))
++      ))) scheduleUpdate();
++    });
++    observer.observe(document.body, {
++      childList: true, subtree: true, attributes: true,
++      attributeFilter: ["id", "data-testid", "data-type", "contenteditable", "hidden", "aria-hidden"]
++    });
++    window.addEventListener("resize", scheduleUpdate);
++    update();
++
++    return () => {
++      if (frame) window.cancelAnimationFrame(frame);
++      observer.disconnect();
++      resizeObserver?.disconnect();
++      window.removeEventListener("resize", scheduleUpdate);
++    };
++  }, [settings.composerWidthScale, settings.chatContentWidth, settings.focusHideChrome, drawerDocked, focusMode, pageId]);
+ 
+   useEffect(() => {
+     const target = canvasResizeTargetRef.current;
+@@ -6531,7 +6673,7 @@
+       window.removeEventListener("resize", handleResize);
+       window.removeEventListener("resize", handleCanvasResize);
+     };
+-  }, [pageId, updateCanvasResizeFrame, updateResizeFrame]);
++  }, [pageId, drawerDocked, updateCanvasResizeFrame, updateResizeFrame]);
+ 
+   useEffect(() => {
+     let frame = 0;
+@@ -6657,12 +6799,12 @@
+       const startX = event.clientX;
+       const startWidth = getThreadWidthPixels(settingsRef.current.chatContentWidth);
+       const main = document.querySelector<HTMLElement>("main");
+-      const rect = main?.getBoundingClientRect();
+-      const leftBound = Math.max(0, rect?.left ?? 0);
+-      const rightBound = Math.min(window.innerWidth, rect?.right ?? window.innerWidth);
+-      const availableWidth = Math.max(340, rightBound - leftBound - 24);
++      const bounds = getThreadContentBounds(main);
++      const leftBound = bounds.left;
++      const rightBound = bounds.right;
++      const availableWidth = Math.max(0, rightBound - leftBound - 24);
+       const center = leftBound + (rightBound - leftBound) / 2;
+-      const top = Math.max(112, (rect?.top ?? 0) + 28);
++      const top = Math.max(112, bounds.top + 28);
+       const bottomGap = 112;
+       const height = Math.max(260, Math.round(window.innerHeight - top - bottomGap));
+       const previousCursor = document.body.style.cursor;
+@@ -6909,6 +7051,7 @@
+         onPanelChange={setActiveToolPanel}
+         onToggleFocus={toggleFocusMode}
+         onChangeTurn={setFocusTurn}
++        onNavigateTurn={navigateToQuestion}
+         onSelectAll={selectAllBlocks}
+         onSelectRole={selectExportRole}
+         onToggleMessage={toggleExportMessage}
+@@ -7055,4 +7198,3 @@
+ } else {
+   mount();
+ }
+-
+--- a/src/i18n.ts
++++ b/src/i18n.ts
+@@ -17,6 +17,9 @@
+     letterSpacing: "左右字距",
+     lineSpacing: "上下行距",
+     contentWidth: "正文宽度",
++    composerWidth: "输入框宽度",
++    composerWidthHint: "100% 为默认宽度；窄窗口自动适配",
++    composerPlaceholder: "输入问题…",
+     officialWidthReset: "恢复官方黑边",
+     navigateAnimation: "定位动画",
+     scrollToTop: "回到聊天顶部",
+@@ -54,6 +57,9 @@
+     letterSpacing: "左右字距",
+     lineSpacing: "上下行距",
+     contentWidth: "正文寬度",
++    composerWidth: "輸入框寬度",
++    composerWidthHint: "100% 為預設寬度；窄視窗自動調整",
++    composerPlaceholder: "輸入問題…",
+     officialWidthReset: "恢復官方黑邊",
+     navigateAnimation: "定位動畫",
+     scrollToTop: "回到聊天頂部",
+@@ -91,6 +97,9 @@
+     letterSpacing: "Horizontal spacing",
+     lineSpacing: "Line spacing",
+     contentWidth: "Content width",
++    composerWidth: "Input width",
++    composerWidthHint: "100% is the default width; fits narrow windows automatically",
++    composerPlaceholder: "Ask a question…",
+     officialWidthReset: "Official width",
+     navigateAnimation: "Jump animation",
+     scrollToTop: "Back to chat top",
+--- a/src/popup.tsx
++++ b/src/popup.tsx
+@@ -84,6 +84,7 @@
+   | "chatLetterSpacing"
+   | "chatLineHeight"
+   | "chatContentWidth"
++  | "composerWidthScale"
+   | "canvasFontScale"
+   | "canvasLetterSpacing"
+   | "canvasLineHeight"
+@@ -1882,7 +1883,11 @@
+     const widthPercent = Math.min(96, 58 + (contentWidth - THREAD_WIDTH_MIN) * 0.95);
+ 
+     return (
+-      <div className="popup-display-preview" aria-hidden="true">
++      <div
++        className="popup-display-preview"
++        aria-hidden="true"
++        style={isCanvas ? undefined : { flexDirection: "column", alignItems: "center", gap: "8px" }}
++      >
+         <div style={{ width: `${widthPercent}%` }}>
+           <strong>{isCanvas ? t.canvasDisplay : extra.readingDisplay}</strong>
+           <p
+@@ -1897,6 +1902,20 @@
+               : "在这里预览效果，结束调节后页面才会一次应用。"}
+           </p>
+         </div>
++        {!isCanvas ? (
++          <div
++            className="popup-composer-preview"
++            style={{
++              width: `${70 * previewSettings.composerWidthScale / 100}%`,
++              border: "1px solid var(--popup-border)",
++              borderRadius: "14px",
++              color: "var(--popup-muted)",
++              fontSize: "10px"
++            }}
++          >
++            {t.composerPlaceholder}
++          </div>
++        ) : null}
+       </div>
+     );
+   };
+@@ -1978,7 +1997,9 @@
+                 {renderDisplayRange({ label: t.letterSpacing, setting: "chatLetterSpacing", min: 0, max: 8, step: 0.1, unit: "px", resetValue: 0 })}
+                 {renderDisplayRange({ label: t.lineSpacing, setting: "chatLineHeight", min: 125, max: 220, step: 1, unit: "%", resetValue: 155 })}
+                 {renderDisplayRange({ label: t.contentWidth, setting: "chatContentWidth", min: THREAD_WIDTH_MIN, max: THREAD_WIDTH_MAX, step: 1, unit: "%", resetValue: OFFICIAL_THREAD_WIDTH })}
++                {renderDisplayRange({ label: t.composerWidth, setting: "composerWidthScale", min: 70, max: 140, step: 1, unit: "%", resetValue: 100 })}
+               </div>
++              <small style={{ color: "var(--popup-muted)", fontSize: "10px" }}>{t.composerWidthHint}</small>
+               <label className="popup-toggle"><span>{extra.widthHandle}</span><input type="checkbox" checked={settings.threadResizeEnabled} onChange={(event) => updateSettings({ threadResizeEnabled: event.currentTarget.checked })} /></label>
+               <button className="popup-secondary" type="button" onClick={() => updateSettings({ chatLayoutVersion: 2, chatContentWidth: OFFICIAL_THREAD_WIDTH })}><MoveHorizontal size={15} aria-hidden="true" />{t.officialWidthReset}</button>
+             </article>
+--- a/src/questionTitle.ts
++++ b/src/questionTitle.ts
+@@ -0,0 +1,110 @@
++const URL_PATTERN = /(?:https?:\/\/|www\.)[^\s<>\[\]，。；！？]+/gi;
++const IMAGE_PATTERN = /!\[[^\]]*\]\([^\n]*?\)|<(?:image|img)\b[^>]*>|\[(?:图片|图像|截图|image|attachment image)\]/gi;
++const TASK_START = /^(?:如何|怎么|怎样|为什么|为何|是否|能否|总结|概括|解释|分析|比较|对比|检查|核查|核验|修改|调整|安装|卸载|生成|撰写|写|绘制|画|修复|解决|翻译|润色|提取|整理|读取|查看|评估|计算|设计|实现|创建|打开|列出|查找|搜索|继续|how\b|why\b|what\b|where\b|which\b|explain\b|summari[sz]e\b|compare\b|check\b|review\b|fix\b|install\b|adjust\b|create\b|write\b|translate\b|extract\b|analy[sz]e\b|implement\b)/i;
++const POLITE_START = /^(?:请(?:问|你|帮我)?|麻烦(?:你)?|烦请|帮(?:助)?我|能不能(?:帮我)?|可不可以(?:帮我)?|能否(?:帮我)?|我想(?:要)?(?:让你)?|我需要|could you\b|can you\b|would you\b|please\b|help me\b|i (?:want|would like) (?:you )?to\b)/i;
++const REFERENCE_START = /^(?:(?:以下|上面|下面|这个|该|所附|上述)?(?:链接|网址|附件|文件|文档)(?:中|里|内|是|为|包含|提供|如下|见)|(?:参考|下载|原文)链接|the (?:link|attachment|document) (?:contains|is|includes)\b)/i;
++const NEGATION = /不要|不必|不能|不允许|无需|禁止|不得|\b(?:not|never|without|don't|do not)\b/i;
++const ATTACHMENT_METADATA = /^(?:(?:文件大小|文件类型|格式|上传时间|上传者|修改时间|最后修改|file size|file type|uploaded by|last modified)\s*[:：]|(?:已上传|上传成功|下载文件|点击下载|预览文件|uploaded successfully)\s*$|(?:PDF|DOCX?|PPTX?|XLSX?)\s*[|·•]\s*\d|\d+(?:\.\d+)?\s*(?:KB|MB|GB|bytes)\s*$)/i;
++
++function removePolitePrefix(value: string): string {
++  let result = value
++    .replace(/^(?:(?:你好|您好|嗨|hello|hi)[，,！!。.:：\s]+)+/i, "")
++    .replace(/[，,。.!！\s]*(?:谢谢(?:你)?|感谢|thank you|thanks)[。.!！\s]*$/i, "");
++  for (let count = 0; count < 4; count += 1) {
++    const next = result.replace(POLITE_START, "").replace(/^[，,:：\s]+/, "");
++    if (!next || next === result) break;
++    result = next;
++  }
++  return result.trim();
++}
++
++function cleanLine(value: string): string {
++  const hasAttachmentMetadata = /\.(?:pdf|docx?|pptx?|xlsx?|png|jpe?g|webp)(?=\s|[（(]|$)|^\s*(?:附件|文件名(?:称)?|filename|file name)\s*[:：]/i.test(value);
++  return value
++    .replace(/^\s*(?:#{1,6}\s*|>\s*|[-*+]\s+|(?:\d+|[一二三四五六七八九十]+)[.)、．）]\s*|[（(]\d+[)）]\s*)/, "")
++    .replace(/\[([^\]]+)\]\([^\n]*?\)/g, "$1")
++    .replace(URL_PATTERN, " ")
++    .replace(/\*\*|__|~~|`/g, "")
++    .replace(/^\s*(?:(?:附件|文件|文档)(?:名(?:称)?)?|链接|图片|截图|filename|file name)\s*[:：]\s*/i, "")
++    .replace(/\[(?:附件|文件|attachment|file)\]/gi, " ")
++    .replace(/\.(?:pdf|docx?|pptx?|xlsx?|png|jpe?g|webp)(?=\s|\(|（|$)/gi, "")
++    .replace(/\s*(?:[（(]\s*)?(?:(?:PDF|DOCX?|PPTX?|XLSX?)\s*[,，|·•]\s*)?\d+(?:\.\d+)?\s*(?:KB|MB|GB|bytes)\s*[)）]?\s*(?:[|·•]\s*已上传)?$/i, (metadata) => hasAttachmentMetadata ? "" : metadata)
++    .replace(/[\t\u00a0 ]+/g, " ")
++    .replace(/^[\s:：,，;；.。!?！？()[\]<>]+|[\s:：,，;；.。!?！？()[\]<>]+$/g, "")
++    .trim();
++}
++
++function selectReferenceRequest(value: string): string {
++  if (!REFERENCE_START.test(value)) return value;
++  const boundary = /[，,；;]\s*(?=(?:请|麻烦|烦请|帮我|能否|如何|怎么|比较|检查|解释|分析|不要|please\b|could you\b|can you\b))/i.exec(value);
++  // 只剥离纯链接说明，不能把前置的“不改数据”等约束一起删掉。
++  if (!boundary || NEGATION.test(value.slice(0, boundary.index))) return value;
++  return value.slice(boundary.index + boundary[0].length);
++}
++
++function formatDocumentTitle(value: string): string {
++  const match = /^([\p{Script=Han}\p{N}]+)[-_]([^，,。；;！？!?]+)$/u.exec(value);
++  if (!match) return value;
++  const [, label, originalTopic] = match;
++  const topic = originalTopic
++    .replace(/\b(Part\s*\d+)[-_]+/gi, "$1 ")
++    .replace(/([a-z])[-_](?=[a-z])/g, "$1 ")
++    .trim();
++  // 调整明确的文档类别词位置；技术词本身不翻译、不改大小写。
++  return /^(?:回稿|修稿|修订稿|修改稿|审稿回复)$/.test(label)
++    ? `${topic} ${label}`
++    : `${label} ${topic}`;
++}
++
++function compactTitle(value: string): string {
++  const hasChinese = /\p{Script=Han}/u.test(value);
++  const limit = hasChinese ? 32 : 48;
++  const characters = Array.from(value);
++  if (characters.length <= limit) return value;
++
++  const prefix = characters.slice(0, limit - 1).join("");
++  const nextCharacter = characters[limit - 1];
++  // 中文可在字间收束；英文和技术标识符在词边界收束。
++  const latinWord = /[\p{Script=Latin}\p{N}_-]/u;
++  let shortened = prefix;
++  if (latinWord.test(prefix.slice(-1)) && latinWord.test(nextCharacter)) {
++    shortened = prefix.replace(/[\p{Script=Latin}\p{N}_-]+$/u, "");
++  }
++  shortened = shortened.replace(/[\s,，;；:：、.。-]+$/, "");
++  // 单个长标识符没有安全词界，保留完整名称，避免生成错误技术名。
++  if (!shortened) return value.split(/\s/)[0];
++  return `${shortened}…`;
++}
++
++/** 仅从原问题抽取本地短标题，不调用模型或生成原文没有的主题。 */
++export function buildQuestionTitle(text: string, fallback?: string): string {
++  const raw = text.replace(/[\u200B-\u200D\uFEFF]/g, "").replace(/\r\n?/g, "\n");
++  const hasUrl = /(?:https?:\/\/|www\.)/i.test(raw);
++  const hasImage = /!\[[^\]]*\]\(|<(?:image|img)\b|\[(?:图片|图像|截图|image|attachment image)\]/i.test(raw);
++  const cleaned = raw
++    .replace(IMAGE_PATTERN, " ")
++    .replace(/```[^\n]*\n[\s\S]*?(?:```|$)/g, " ")
++    // DOM 提取有时会把“文件标题 + 编号请求”压成同一行。
++    .replace(/[\t ]+(?=(?:\d{1,2}[、．）)]|\d{1,2}\.(?=\s)|[（(]\d{1,2}[)）]|[一二三四五六七八九十]+[、．）]))/gu, "\n");
++  const candidates = cleaned.split(/\n|[。！？!?](?=\s|[\p{Script=Han}]|$)/u)
++    .map((line, index) => {
++      const plain = selectReferenceRequest(cleanLine(line));
++      const title = removePolitePrefix(plain);
++      const hasNegation = NEGATION.test(title);
++      const score = (POLITE_START.test(plain) ? 12 : 0) + (TASK_START.test(title) ? 8 : 0)
++        + (hasNegation ? 4 : 0) - (REFERENCE_START.test(title) && !hasNegation ? 6 : 0);
++      return { title, score, index, metadata: ATTACHMENT_METADATA.test(plain) || ATTACHMENT_METADATA.test(line.trim()) };
++    })
++    .filter(({ title, metadata }) => !metadata && title && !/^(?:附件|文件|文档|链接|图片|截图|attachment|file|image)$/i.test(title));
++
++  if (candidates.length === 0) {
++    return compactTitle(fallback?.trim() || (hasImage ? "图片相关问题" : hasUrl ? "链接相关问题" : "问题"));
++  }
++
++  const selected = candidates.sort((left, right) => right.score - left.score || left.index - right.index)[0];
++  let title = selected.title;
++  if (selected.score === 0) {
++    title = formatDocumentTitle(title);
++  }
++  return compactTitle(title);
++}
+--- a/src/shared.ts
++++ b/src/shared.ts
+@@ -236,6 +236,7 @@
+   canvasWidthEnabled: boolean;
+   chatLayoutVersion: 2;
+   chatContentWidth: number;
++  composerWidthScale: number;
+   threadResizeEnabled: boolean;
+   compatRulesRemoteEnabled: boolean;
+   compatRulesAutoSyncEnabled: boolean;
+@@ -260,6 +261,7 @@
+   canvasWidthEnabled: false,
+   chatLayoutVersion: 2,
+   chatContentWidth: 60,
++  composerWidthScale: 100,
+   threadResizeEnabled: false,
+   compatRulesRemoteEnabled: false,
+   compatRulesAutoSyncEnabled: true,
+@@ -302,6 +304,7 @@
+     canvasWidthEnabled: Boolean(value?.canvasWidthEnabled),
+     chatLayoutVersion: 2,
+     chatContentWidth: clampNumber(isCurrentLayout ? value?.chatContentWidth : undefined, 60, 100, 60),
++    composerWidthScale: clampNumber(value?.composerWidthScale, 70, 140, 100),
+     threadResizeEnabled: Boolean(value?.threadResizeEnabled),
+     compatRulesRemoteEnabled: Boolean(value?.compatRulesRemoteEnabled),
+     compatRulesAutoSyncEnabled: value?.compatRulesAutoSyncEnabled !== false,
+--- a/src/threadLayout.ts
++++ b/src/threadLayout.ts
+@@ -0,0 +1,15 @@
++/** The usable chat area excludes native padding and the docked reading drawer. */
++export function getThreadContentBounds(main: HTMLElement | null) {
++  if (!main) return { left: 0, right: window.innerWidth, top: 0 };
++
++  const rect = main.getBoundingClientRect();
++  const style = window.getComputedStyle(main);
++  const pixels = (value: string) => Number.parseFloat(value) || 0;
++  const left = Math.min(window.innerWidth, Math.max(0,
++    rect.left + pixels(style.borderLeftWidth) + pixels(style.paddingLeft)
++  ));
++  const right = Math.max(left, Math.min(window.innerWidth,
++    rect.right - pixels(style.borderRightWidth) - pixels(style.paddingRight)
++  ));
++  return { left, right, top: rect.top };
++}
+--- a/src/styles/content.css
++++ b/src/styles/content.css
+@@ -633,9 +633,18 @@
+   display: block;
+ }
+ 
+-html[data-cnav-drawer-docked="true"] main#main {
+-  margin-inline-end: 394px !important;
+-  transition: margin-inline-end 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
++html {
++  --cnav-reading-drawer-width: 380px;
++  --cnav-reading-drawer-inset: 12px;
++  --cnav-reading-drawer-gap: 12px;
++}
++
++/* Reserve space inside the main content box, including on width: 100% layouts.
++   Removing the dock attribute restores the site's own spacing immediately. */
++html[data-cnav-drawer-docked="true"] main:not(main main) {
++  box-sizing: border-box !important;
++  min-width: 0 !important;
++  padding-right: calc(var(--cnav-reading-drawer-width) + var(--cnav-reading-drawer-inset) + var(--cnav-reading-drawer-gap)) !important;
+ }
+ 
+ html[data-cnav-focus-mode="true"] {
+@@ -778,12 +787,12 @@
+   --cnav-panel-accent-soft: rgba(15, 159, 122, 0.11);
+   position: fixed;
+   top: 12px;
+-  right: 12px;
++  right: var(--cnav-reading-drawer-inset);
+   bottom: 12px;
+   z-index: 2147483645;
+   display: grid;
+   grid-template-rows: auto auto minmax(0, 1fr);
+-  width: 380px;
++  width: var(--cnav-reading-drawer-width);
+   overflow: hidden;
+   border: 1px solid rgba(255, 255, 255, 0.7);
+   border-radius: 18px;
+@@ -1072,10 +1081,27 @@
+   scrollbar-width: thin;
+ }
+ 
+-#conversation-navigator-root .cnav-turn-list { display: grid; gap: 6px; }
++#conversation-navigator-root .cnav-focus-options {
++  flex-shrink: 0;
++  border: 1px solid var(--cnav-panel-border);
++  border-radius: 10px;
++  padding: 9px 11px;
++  color: var(--cnav-panel-muted);
++  font-size: 12px;
++}
++
++#conversation-navigator-root .cnav-focus-options summary { cursor: pointer; }
++#conversation-navigator-root .cnav-focus-options p { margin: 8px 0; line-height: 1.5; }
++#conversation-navigator-root .cnav-focus-options .cnav-primary-action { width: 100%; }
++#conversation-navigator-root .cnav-focus-options .cnav-progress-card,
++#conversation-navigator-root .cnav-focus-options .cnav-focus-navigation { margin-top: 10px; }
++
++#conversation-navigator-root .cnav-turn-list { display: grid; gap: 6px; flex: 1; align-content: start; }
+ #conversation-navigator-root .cnav-turn-list > button {
+   display: grid;
+-  gap: 3px;
++  grid-template-columns: 28px minmax(0, 1fr);
++  align-items: start;
++  column-gap: 8px;
+   width: 100%;
+   border: 1px solid transparent;
+   border-radius: 12px;
+@@ -1088,8 +1114,25 @@
+ 
+ #conversation-navigator-root .cnav-turn-list > button:hover { background: var(--cnav-panel-surface-2); }
+ #conversation-navigator-root .cnav-turn-list > button.is-active { border-color: color-mix(in srgb, var(--cnav-panel-accent) 25%, transparent); background: var(--cnav-panel-accent-soft); }
+-#conversation-navigator-root .cnav-turn-list small { color: var(--cnav-panel-accent); font-size: 10px; font-weight: 760; }
+-#conversation-navigator-root .cnav-turn-list span { overflow: hidden; font-size: 12px; font-weight: 650; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
++#conversation-navigator-root .cnav-turn-list small {
++  color: var(--cnav-panel-accent);
++  font-size: 10px;
++  font-weight: 650;
++  line-height: 18px;
++  font-variant-numeric: tabular-nums;
++  white-space: nowrap;
++}
++#conversation-navigator-root .cnav-turn-list span {
++  display: -webkit-box;
++  -webkit-box-orient: vertical;
++  -webkit-line-clamp: 2;
++  overflow: hidden;
++  overflow-wrap: break-word;
++  min-width: 0;
++  font-size: 12px;
++  font-weight: 550;
++  line-height: 1.5;
++}
+ 
+ #conversation-navigator-root .cnav-panel-toolbar,
+ #conversation-navigator-root .cnav-citation-actions {
+--- a/tests/composerLayout.test.ts
++++ b/tests/composerLayout.test.ts
+@@ -0,0 +1,163 @@
++import assert from "node:assert/strict";
++import test, { type TestContext } from "node:test";
++import { JSDOM } from "jsdom";
++import { applyComposerWidth, clearComposerWidth, findComposerLayout } from "../src/composerLayout";
++
++function installPage(t: TestContext, body: string) {
++  const dom = new JSDOM(`<!doctype html><html><body>${body}</body></html>`);
++  const { window } = dom;
++  Object.assign(globalThis, { window, document: window.document });
++  t.after(() => window.close());
++  // JSDOM 不排版：模拟原始几何和已应用的 CSS 缩放，检验测量是否先撤销旧比例。
++  window.HTMLElement.prototype.getBoundingClientRect = function () {
++    let width = Number(this.getAttribute("data-natural-width") || 900);
++    const root = window.document.documentElement;
++    if (root.dataset.cnavComposerWidth === "true" && this.hasAttribute("data-cnav-composer-width-target")) {
++      const base = Number.parseFloat(root.style.getPropertyValue("--cnav-composer-base-width"));
++      const scale = Number.parseFloat(root.style.getPropertyValue("--cnav-composer-scale"));
++      width = base * scale;
++    }
++    return { x: 20, y: 300, left: 20, right: 20 + width, top: 300, bottom: 380, width, height: 80, toJSON() {} };
++  };
++  return window.document;
++}
++
++function element(id: string): HTMLElement {
++  return document.getElementById(id)!;
++}
++
++test("finds the bottom composer outside main without resizing the conversation container", (t) => {
++  installPage(t, `
++    <main id="conversation"><article data-message-author-role="assistant">Answer</article></main>
++    <footer id="dock"><form id="composer" data-type="unified-composer" data-natural-width="720">
++      <textarea id="prompt-textarea"></textarea><button>Send</button>
++    </form></footer>
++  `);
++  const layout = findComposerLayout();
++  assert.ok(layout);
++  assert.equal(layout.target, element("composer"));
++  assert.equal(layout.editor, element("prompt-textarea"));
++  assert.equal(layout.host, document.body);
++  assert.equal(applyComposerWidth(120), document.body);
++  assert.equal(document.documentElement.style.getPropertyValue("--cnav-composer-base-width"), "720.00px");
++  assert.equal(element("conversation").hasAttribute("data-cnav-composer-width-ancestor"), false);
++  assert.equal(document.body.hasAttribute("data-cnav-composer-width-ancestor"), false);
++});
++
++test("a composer without form uses its painted rounded shell", (t) => {
++  installPage(t, `
++    <main id="host"><section data-testid="chat-composer">
++      <div id="shell" data-natural-width="580" style="background:rgb(240,240,240);border-radius:20px">
++        <div id="editor" contenteditable="true"></div><button>Send</button>
++      </div>
++    </section></main>
++  `);
++  const layout = findComposerLayout();
++  assert.ok(layout);
++  assert.equal(layout.editor, element("editor"));
++  assert.equal(layout.target, element("shell"));
++  assert.equal(layout.host, element("host"));
++  applyComposerWidth(80);
++  assert.equal(element("shell").getAttribute("data-cnav-composer-width-target"), "true");
++  assert.equal(document.documentElement.style.getPropertyValue("--cnav-composer-base-width"), "580.00px");
++});
++
++test("measures the rounded background shell independently from a wider form", (t) => {
++  installPage(t, `
++    <main id="host"><form id="wide-form" data-type="unified-composer" data-natural-width="1080">
++      <div id="shell" data-natural-width="640" style="background-color:white;border-radius:18px">
++        <div><textarea id="prompt-textarea" data-natural-width="600"></textarea></div>
++        <button>Send</button>
++      </div>
++    </form></main>
++  `);
++  applyComposerWidth(140);
++  assert.equal(findComposerLayout()?.target, element("shell"));
++  assert.equal(document.documentElement.style.getPropertyValue("--cnav-composer-base-width"), "640.00px");
++  assert.equal(element("wide-form").hasAttribute("data-cnav-composer-width-target"), false);
++  assert.equal(element("wide-form").getAttribute("data-cnav-composer-width-ancestor"), "true");
++  assert.equal(element("host").hasAttribute("data-cnav-composer-width-ancestor"), false);
++});
++
++test("an attached document does not disqualify the actual composer shell", (t) => {
++  installPage(t, `
++    <form data-type="unified-composer">
++      <div id="shell" data-testid="composer-background" data-natural-width="620">
++        <div role="document" aria-label="Uploaded attachment">paper.pdf</div>
++        <textarea id="prompt-textarea"></textarea><button>Send</button>
++      </div>
++    </form>
++  `);
++  assert.equal(findComposerLayout()?.target, element("shell"));
++  applyComposerWidth(125);
++  assert.equal(document.documentElement.style.getPropertyValue("--cnav-composer-base-width"), "620.00px");
++});
++
++test("excludes Canvas, existing message editors and hidden composers before selecting the live input", (t) => {
++  installPage(t, `
++    <section data-testid="canvas-panel"><form data-type="unified-composer"><textarea id="canvas-editor"></textarea></form></section>
++    <article data-message-author-role="user"><form data-type="unified-composer"><textarea id="message-editor"></textarea></form></article>
++    <article data-testid="conversation-turn-3"><form data-type="unified-composer"><textarea id="turn-editor"></textarea></form></article>
++    <div hidden><form data-type="unified-composer"><textarea id="hidden-editor"></textarea></form></div>
++    <div id="conversation-navigator-root"><form data-type="unified-composer"><textarea id="extension-editor"></textarea></form></div>
++    <footer><form id="live-form" data-type="unified-composer"><textarea id="live-editor"></textarea><button>Send</button></form></footer>
++  `);
++  const layout = findComposerLayout();
++  assert.equal(layout?.editor, element("live-editor"));
++  assert.equal(layout?.target, element("live-form"));
++  applyComposerWidth(120);
++  for (const id of ["canvas-editor", "message-editor", "turn-editor", "hidden-editor", "extension-editor"]) {
++    assert.equal(element(id).closest("[data-cnav-composer-width-target],[data-cnav-composer-width-ancestor]"), null);
++  }
++});
++
++test("reset and explicit cleanup remove owned width markers without changing page styles", (t) => {
++  installPage(t, `
++    <main><div id="wrapper" style="padding:12px"><form id="composer" data-type="unified-composer" style="max-width:720px">
++      <textarea id="prompt-textarea"></textarea><button>Send</button>
++    </form></div></main>
++  `);
++  const composerStyle = element("composer").getAttribute("style");
++  const wrapperStyle = element("wrapper").getAttribute("style");
++  for (const reset of [clearComposerWidth, () => applyComposerWidth(100)]) {
++    applyComposerWidth(130);
++    assert.equal(document.documentElement.dataset.cnavComposerWidth, "true");
++    reset();
++    assert.equal(document.documentElement.dataset.cnavComposerWidth, undefined);
++    assert.equal(document.documentElement.style.getPropertyValue("--cnav-composer-base-width"), "");
++    assert.equal(document.querySelectorAll("[data-cnav-composer-width-target],[data-cnav-composer-width-ancestor]").length, 0);
++    assert.equal(element("composer").getAttribute("style"), composerStyle);
++    assert.equal(element("wrapper").getAttribute("style"), wrapperStyle);
++  }
++});
++
++test("repeated application and a replacement composer remeasure the natural width without compounding", (t) => {
++  installPage(t, `
++    <main id="host"><form id="composer" data-type="unified-composer" data-natural-width="600">
++      <textarea id="prompt-textarea"></textarea><button>Send</button>
++    </form></main>
++  `);
++  applyComposerWidth(140);
++  assert.equal(element("composer").getBoundingClientRect().width, 840);
++  applyComposerWidth(120);
++  assert.equal(document.documentElement.style.getPropertyValue("--cnav-composer-base-width"), "600.00px");
++  assert.equal(element("composer").getBoundingClientRect().width, 720);
++
++  element("host").innerHTML = `<div data-testid="chat-composer"><div id="replacement" data-testid="composer-surface" data-natural-width="500">
++    <div id="replacement-editor" contenteditable="true"></div><button>Send</button>
++  </div></div>`;
++  applyComposerWidth(120);
++  assert.equal(findComposerLayout()?.target, element("replacement"));
++  assert.equal(document.documentElement.style.getPropertyValue("--cnav-composer-base-width"), "500.00px");
++  assert.equal(element("replacement").getBoundingClientRect().width, 600);
++  assert.equal(document.querySelectorAll("[data-cnav-composer-width-target]").length, 1);
++});
++
++test("a page containing only an excluded editor leaves no active composer width", (t) => {
++  installPage(t, `<section data-cnav-canvas-root><form data-type="unified-composer"><textarea id="prompt-textarea"></textarea></form></section>`);
++  assert.equal(findComposerLayout(), null);
++  assert.equal(applyComposerWidth(125), null);
++  assert.equal(document.documentElement.dataset.cnavComposerWidth, undefined);
++  assert.equal(document.documentElement.dataset.cnavComposerStatus, "not-found");
++  assert.equal(document.documentElement.style.getPropertyValue("--cnav-composer-base-width"), "");
++});
+--- a/tests/composerSettings.test.ts
++++ b/tests/composerSettings.test.ts
+@@ -0,0 +1,50 @@
++import assert from "node:assert/strict";
++import test from "node:test";
++import { DEFAULT_SETTINGS, normalizeSettings } from "../src/shared";
++
++test("new installations and old settings use the default composer width", () => {
++  assert.equal(DEFAULT_SETTINGS.composerWidthScale, 100);
++  assert.equal(normalizeSettings(undefined).composerWidthScale, 100);
++
++  const previousSettings = {
++    language: "zh-TW" as const,
++    chatLayoutVersion: 2 as const,
++    chatContentWidth: 84,
++    chatFontScale: 125,
++    chatLetterSpacing: 0.6,
++    chatLineHeight: 170,
++    canvasContentWidth: 72,
++    canvasWidthEnabled: true,
++    threadResizeEnabled: true,
++    drawerMode: "dock" as const,
++    focusCollapseOtherTurns: false
++  };
++  const normalized = normalizeSettings(previousSettings);
++  assert.equal(normalized.composerWidthScale, 100);
++  for (const [key, value] of Object.entries(previousSettings)) {
++    assert.equal(normalized[key as keyof typeof normalized], value, `preserves ${key}`);
++  }
++});
++
++test("composer width clamps to 70–140 without changing body or Canvas widths", () => {
++  for (const [input, expected] of [[20, 70], [70, 70], [100, 100], [125, 125], [140, 140], [300, 140]]) {
++    const normalized = normalizeSettings({
++      chatLayoutVersion: 2,
++      chatContentWidth: 83,
++      canvasContentWidth: 67,
++      composerWidthScale: input
++    });
++    assert.equal(normalized.composerWidthScale, expected);
++    assert.equal(normalized.chatContentWidth, 83);
++    assert.equal(normalized.canvasContentWidth, 67);
++  }
++});
++
++test("non-finite composer settings fall back and saved values survive normalization", () => {
++  for (const composerWidthScale of [NaN, Infinity, -Infinity]) {
++    assert.equal(normalizeSettings({ composerWidthScale }).composerWidthScale, 100);
++  }
++  const saved = normalizeSettings({ composerWidthScale: 120, language: "en", drawerMode: "overlay" });
++  assert.deepEqual(normalizeSettings(JSON.parse(JSON.stringify(saved))), saved);
++  assert.equal(normalizeSettings({ ...saved, chatContentWidth: 95 }).composerWidthScale, 120);
++});
+--- a/tests/questionTitle.test.ts
++++ b/tests/questionTitle.test.ts
+@@ -0,0 +1,112 @@
++import assert from "node:assert/strict";
++import test from "node:test";
++import { buildQuestionTitle } from "../src/questionTitle";
++
++test("a shared document title stays readable without its URL", () => {
++  assert.equal(
++    buildQuestionTitle("回稿-Part2-nesting-function https://drive.google.com/file/d/123/view"),
++    "Part2 nesting function 回稿"
++  );
++});
++
++test("flattened document headings do not absorb numbered link explanations", () => {
++  for (const numbering of ["1、", "1. ", "（1）", "一、"]) {
++    assert.equal(
++      buildQuestionTitle(`回稿-Part2-nesting-function ${numbering}链接中是本次回稿的资料 https://drive.google.com/file/d/123/view`),
++      "Part2 nesting function 回稿"
++    );
++  }
++  assert.equal(
++    buildQuestionTitle("[回稿-Part2-nesting-function.docx](https://drive.google.com/file/d/123/view) 1、链接中包含文稿 2、附件中是补充材料"),
++    "Part2 nesting function 回稿"
++  );
++});
++
++test("attachment labels, sizes and upload metadata are not question topics", () => {
++  assert.equal(
++    buildQuestionTitle("文件类型：DOCX\n文件大小：2.4 MB\n文件名：回稿-Part2-nesting-function.docx (DOCX, 2.4 MB)\n上传成功\n1、链接中是原文"),
++    "Part2 nesting function 回稿"
++  );
++  assert.equal(buildQuestionTitle("文件大小：2.4 MB\n请检查 Ti-Al 的弹性常数"), "检查 Ti-Al 的弹性常数");
++  assert.equal(buildQuestionTitle("1、文件大小：2.4 MB 2、文件名：回稿-Part2-nesting-function.docx"), "Part2 nesting function 回稿");
++  assert.equal(buildQuestionTitle("文件大小如何计算"), "文件大小如何计算");
++  assert.equal(buildQuestionTitle("请把内存限制为 2 GB"), "把内存限制为 2 GB");
++});
++
++test("a real task following a link introduction wins over the document label", () => {
++  assert.equal(
++    buildQuestionTitle("回稿-Part2-nesting-function\n1、链接中是原稿，请帮我解释 nesting function 的计算方法"),
++    "解释 nesting function 的计算方法"
++  );
++  assert.equal(
++    buildQuestionTitle("链接中是代码，请不要覆盖原数据，只修改图例"),
++    "不要覆盖原数据，只修改图例"
++  );
++  assert.equal(buildQuestionTitle("链接中的原始数据不要改，请检查图例"), "链接中的原始数据不要改，请检查图例");
++  assert.equal(buildQuestionTitle("回稿-Part2-nesting-function 1、链接中是原稿，不要重算数据，只修改图例"), "不要重算数据，只修改图例");
++});
++
++test("file title cleanup preserves model names, chemical hyphens and decimal versions", () => {
++  assert.equal(buildQuestionTitle("回稿-MACE-MH-1.pdf 1、链接中是模型报告"), "MACE-MH-1 回稿");
++  assert.equal(buildQuestionTitle("回稿-Ti-Al.pdf"), "Ti-Al 回稿");
++  assert.equal(buildQuestionTitle("请解释 Python 3.12 的兼容性"), "解释 Python 3.12 的兼容性");
++});
++
++test("the actual multiline request outranks document and link preambles", () => {
++  assert.equal(
++    buildQuestionTitle("附件：回稿-Part2-nesting-function.pdf\nhttps://drive.google.com/file/d/123/view\n请帮我解释 nesting function 的计算方法。"),
++    "解释 nesting function 的计算方法"
++  );
++  assert.equal(
++    buildQuestionTitle("以下是我的资料\n1. [研究计划](https://example.com/plan)\n2. 请比较 NM 与 AFM 的光学结果"),
++    "比较 NM 与 AFM 的光学结果"
++  );
++});
++
++test("Markdown and polite openings are removed without changing technical terms", () => {
++  assert.equal(buildQuestionTitle("## 你好，请帮我**检查 Ti-Al 的 E-V 曲线**，谢谢。"), "检查 Ti-Al 的 E-V 曲线");
++  assert.equal(buildQuestionTitle("Please explain `MACE-MH-1` stress units."), "explain MACE-MH-1 stress units");
++  assert.equal(buildQuestionTitle("比较Ti-Al弹性常数"), "比较Ti-Al弹性常数");
++  assert.equal(buildQuestionTitle("MACE-MH-1精度"), "MACE-MH-1精度");
++});
++
++test("negation remains in the title", () => {
++  assert.equal(buildQuestionTitle("请不要重算能量，只调整图例"), "不要重算能量，只调整图例");
++  assert.equal(buildQuestionTitle("Could you not overwrite the original data?"), "not overwrite the original data");
++});
++
++test("short follow-ups remain recognizable", () => {
++  for (const text of ["继续", "不要继续", "好的", "下一步", "重新检查"]) {
++    assert.equal(buildQuestionTitle(text), text);
++  }
++});
++
++test("URL-only and image-only messages have honest fallbacks", () => {
++  assert.equal(buildQuestionTitle("https://example.com/a"), "链接相关问题");
++  assert.equal(buildQuestionTitle("[https://example.com/a](https://example.com/a)"), "链接相关问题");
++  assert.equal(buildQuestionTitle("![对话截图](https://example.com/image.png)"), "图片相关问题");
++  assert.equal(buildQuestionTitle("[图片]"), "图片相关问题");
++  assert.equal(buildQuestionTitle(" \n ", "第 7 轮"), "第 7 轮");
++  assert.equal(buildQuestionTitle(""), "问题");
++});
++
++test("a later request is not hidden by a pasted code block", () => {
++  assert.equal(buildQuestionTitle("```python\nraise RuntimeError('x')\n```\n请解释这个错误"), "解释这个错误");
++});
++
++test("long Chinese titles stay compact and keep their initial negation", () => {
++  const result = buildQuestionTitle("请不要修改已有的计算结果，检查不同磁性状态下的光学电导和介电函数是否使用了相同的展宽参数");
++  assert.ok(result.startsWith("不要修改已有的计算结果"));
++  assert.ok(Array.from(result).length <= 32);
++  assert.ok(result.endsWith("…"));
++});
++
++test("English titles are shortened at word boundaries", () => {
++  const result = buildQuestionTitle("Please compare the calculated optical conductivity between the ferromagnetic and nonmagnetic phases");
++  assert.equal(result, "compare the calculated optical conductivity…");
++  assert.ok(Array.from(result).length <= 48);
++});
++
++test("invisible characters and mixed line endings do not pollute titles", () => {
++  assert.equal(buildQuestionTitle("\uFEFF文档：资料.pdf\r\n\r\n请\u200B检查\t声子谱"), "检查 声子谱");
++});
+--- a/tests/threadLayout.test.ts
++++ b/tests/threadLayout.test.ts
+@@ -0,0 +1,38 @@
++import assert from "node:assert/strict";
++import test from "node:test";
++import { JSDOM } from "jsdom";
++import { getThreadContentBounds } from "../src/threadLayout";
++
++function installMain(padding = "0px") {
++  const dom = new JSDOM(`<main style="padding:${padding};border:2px solid"></main>`);
++  Object.assign(globalThis, { window: dom.window, document: dom.window.document });
++  Object.defineProperty(window, "innerWidth", { value: 2048 });
++  const main = document.querySelector("main")!;
++  main.getBoundingClientRect = () => ({ left: 260, right: 2048, top: 52 } as DOMRect);
++  return main;
++}
++
++test("resize handles use the remaining chat area when the drawer docks and restore on close", () => {
++  const main = installMain("0px 16px");
++  const original = getThreadContentBounds(main);
++  assert.deepEqual(original, { left: 278, right: 2030, top: 52 });
++
++  main.style.paddingRight = "404px";
++  const docked = getThreadContentBounds(main);
++  assert.deepEqual(docked, { left: 278, right: 1642, top: 52 });
++  assert.equal((original.left + original.right - docked.left - docked.right) / 2, 194);
++
++  main.style.paddingRight = "16px";
++  assert.deepEqual(getThreadContentBounds(main), original);
++});
++
++test("content bounds remain within the viewport and cannot have negative width", () => {
++  const main = installMain("0px 404px 0px 12px");
++  main.getBoundingClientRect = () => ({ left: -100, right: 250, top: 0 } as DOMRect);
++  assert.deepEqual(getThreadContentBounds(main), { left: 0, right: 0, top: 0 });
++});
++
++test("pages without a main element use viewport bounds", () => {
++  installMain();
++  assert.deepEqual(getThreadContentBounds(null), { left: 0, right: 2048, top: 0 });
++});
+--- a/tests/v10UiAndExport.test.ts
++++ b/tests/v10UiAndExport.test.ts
+@@ -4,12 +4,12 @@
+ import { buildExportDocument } from "../src/popup";
+ import { DEFAULT_SELECTIVE_EXPORT_PREFERENCES, ExportSnapshot } from "../src/shared";
+ 
+-test("manifest and package metadata are unified on the V10 release", () => {
++test("manifest and package metadata identify the local V10 composer width build", () => {
+   const manifest = JSON.parse(readFileSync(new URL("../manifest.json", import.meta.url), "utf8"));
+   const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+-  assert.equal(manifest.version, "2026.10.0");
+-  assert.equal(manifest.version_name, "2026-V10正式版");
+-  assert.equal(packageJson.version, "2026.10.0");
++  assert.equal(manifest.version, "2026.10.4");
++  assert.equal(manifest.version_name, "2026-V10 目录与输入框修复版");
++  assert.equal(packageJson.version, manifest.version);
+   assert.deepEqual(manifest.optional_host_permissions, ["http://*/*", "https://*/*"]);
+ });
+ 
+--- a/manifest.json
++++ b/manifest.json
+@@ -1,8 +1,8 @@
+ {
+   "manifest_version": 3,
+   "name": "GPT页面增强工具",
+-  "version": "2026.10.0",
+-  "version_name": "2026-V10正式版",
++  "version": "2026.10.4",
++  "version_name": "2026-V10 目录与输入框修复版",
+   "minimum_chrome_version": "114",
+   "description": "GPT页面增强工具：为 ChatGPT 增加专注阅读、选择性导出、引用管理、排版与素材工具。",
+   "permissions": ["storage", "clipboardWrite"],
+--- a/package.json
++++ b/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "gpt-chat-navigator-extension",
+-  "version": "2026.10.0",
++  "version": "2026.10.4",
+   "private": true,
+   "type": "module",
+   "description": "GPT页面增强工具：本地增强 ChatGPT 专注阅读、选择性导出、引用管理、排版与素材工具。",
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1,12 +1,12 @@
+ {
+   "name": "gpt-chat-navigator-extension",
+-  "version": "2026.10.0",
++  "version": "2026.10.4",
+   "lockfileVersion": 3,
+   "requires": true,
+   "packages": {
+     "": {
+       "name": "gpt-chat-navigator-extension",
+-      "version": "2026.10.0",
++      "version": "2026.10.4",
+       "dependencies": {
+         "lucide-react": "^0.468.0",
+         "react": "^18.3.1",

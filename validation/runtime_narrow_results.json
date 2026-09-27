@@ -1,0 +1,191 @@
+{
+  "narrow": true,
+  "passed": true,
+  "assertions": [
+    {
+      "name": "outside_main_without_form_actual_bundle_marks_visual_shell",
+      "pass": true,
+      "detail": {
+        "label": "outside_main_without_form_140",
+        "composer": {
+          "left": 48,
+          "right": 568,
+          "width": 520,
+          "center": 308
+        },
+        "assistant": {
+          "left": 24,
+          "right": 592,
+          "width": 568,
+          "center": 308
+        },
+        "canvas": {
+          "left": 81,
+          "right": 535,
+          "width": 454,
+          "center": 308
+        },
+        "viewport": 616,
+        "overflow": 0,
+        "targets": [
+          "visual-shell"
+        ],
+        "base": "520.00px"
+      }
+    },
+    {
+      "name": "narrow_140_has_no_overflow",
+      "pass": true,
+      "detail": {
+        "label": "outside_main_without_form_140",
+        "composer": {
+          "left": 48,
+          "right": 568,
+          "width": 520,
+          "center": 308
+        },
+        "assistant": {
+          "left": 24,
+          "right": 592,
+          "width": 568,
+          "center": 308
+        },
+        "canvas": {
+          "left": 81,
+          "right": 535,
+          "width": 454,
+          "center": 308
+        },
+        "viewport": 616,
+        "overflow": 0,
+        "targets": [
+          "visual-shell"
+        ],
+        "base": "520.00px"
+      }
+    },
+    {
+      "name": "outside_main_without_form_preserves_assistant_and_canvas",
+      "pass": true,
+      "detail": {
+        "before": {
+          "label": "outside_main_without_form_100",
+          "composer": {
+            "left": 48,
+            "right": 568,
+            "width": 520,
+            "center": 308
+          },
+          "assistant": {
+            "left": 24,
+            "right": 592,
+            "width": 568,
+            "center": 308
+          },
+          "canvas": {
+            "left": 81,
+            "right": 535,
+            "width": 454,
+            "center": 308
+          },
+          "viewport": 616,
+          "overflow": 0,
+          "targets": [],
+          "base": ""
+        },
+        "after": {
+          "label": "outside_main_without_form_140",
+          "composer": {
+            "left": 48,
+            "right": 568,
+            "width": 520,
+            "center": 308
+          },
+          "assistant": {
+            "left": 24,
+            "right": 592,
+            "width": 568,
+            "center": 308
+          },
+          "canvas": {
+            "left": 81,
+            "right": 535,
+            "width": 454,
+            "center": 308
+          },
+          "viewport": 616,
+          "overflow": 0,
+          "targets": [
+            "visual-shell"
+          ],
+          "base": "520.00px"
+        }
+      }
+    },
+    {
+      "name": "no_runtime_or_network_errors",
+      "pass": true,
+      "detail": {
+        "errors": [],
+        "warnings": [],
+        "network": []
+      }
+    }
+  ],
+  "states": [
+    {
+      "label": "outside_main_without_form_100",
+      "composer": {
+        "left": 48,
+        "right": 568,
+        "width": 520,
+        "center": 308
+      },
+      "assistant": {
+        "left": 24,
+        "right": 592,
+        "width": 568,
+        "center": 308
+      },
+      "canvas": {
+        "left": 81,
+        "right": 535,
+        "width": 454,
+        "center": 308
+      },
+      "viewport": 616,
+      "overflow": 0,
+      "targets": [],
+      "base": ""
+    },
+    {
+      "label": "outside_main_without_form_140",
+      "composer": {
+        "left": 48,
+        "right": 568,
+        "width": 520,
+        "center": 308
+      },
+      "assistant": {
+        "left": 24,
+        "right": 592,
+        "width": 568,
+        "center": 308
+      },
+      "canvas": {
+        "left": 81,
+        "right": 535,
+        "width": 454,
+        "center": 308
+      },
+      "viewport": 616,
+      "overflow": 0,
+      "targets": [
+        "visual-shell"
+      ],
+      "base": "520.00px"
+    }
+  ],
+  "errors": [],
+  "warnings": []
+}
