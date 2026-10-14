@@ -4,11 +4,11 @@ import test from "node:test";
 import { buildExportDocument } from "../src/popup";
 import { DEFAULT_SELECTIVE_EXPORT_PREFERENCES, ExportSnapshot } from "../src/shared";
 
-test("manifest and package metadata identify the local V10 composer width build", () => {
+test("manifest and package metadata identify the multi-site release", () => {
   const manifest = JSON.parse(readFileSync(new URL("../manifest.json", import.meta.url), "utf8"));
   const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
-  assert.equal(manifest.version, "2026.10.4");
-  assert.equal(manifest.version_name, "2026-V10 目录与输入框修复版");
+  assert.equal(manifest.version, "2026.10.5");
+  assert.equal(manifest.version_name, "2026-V11 多站点适配版");
   assert.equal(packageJson.version, manifest.version);
   assert.deepEqual(manifest.optional_host_permissions, ["http://*/*", "https://*/*"]);
 });

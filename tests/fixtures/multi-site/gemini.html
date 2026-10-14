@@ -1,0 +1,7 @@
+<header>Gemini header</header><bard-sidenav><nav><a href="/app/history">History</a></nav></bard-sidenav>
+<chat-window><infinite-scroller class="chat-history" id="conversation">
+  <div class="conversation-container"><user-query><user-query-content><div data-turn="user" id="user-query-content-1"><div class="query-text"><p>解释这个结果</p></div><button>Expand</button></div></user-query-content></user-query>
+  <model-response><message-content><div class="markdown"><p>这是第一轮回答。</p><pre><code class="language-python">print(42)</code></pre><table><tr><th>值</th></tr><tr><td>42</td></tr></table><p><a href="https://example.org/paper">参考资料</a><a href="https://gemini.google.com/app/other">Other chat</a></p></div></message-content><div class="model-response-footer"><button>Copy</button></div></model-response></div>
+  <div class="conversation-container"><user-query><user-query-content><div data-turn="user" id="user-query-content-2"><div class="query-text"><p>解释这个结果</p></div></div></user-query-content></user-query><model-response><message-content><p id="streaming-tail">第二轮回答。</p></message-content></model-response></div>
+</infinite-scroller></chat-window>
+<input-container><div id="input-shell"><rich-textarea><div class="ql-editor" contenteditable="true" role="textbox">尚未发送的草稿</div></rich-textarea><button>Send</button></div></input-container>

@@ -1,15 +1,24 @@
 {
   "manifest_version": 3,
   "name": "GPT页面增强工具",
-  "version": "2026.10.4",
-  "version_name": "2026-V10 目录与输入框修复版",
+  "version": "2026.10.5",
+  "version_name": "2026-V11 多站点适配版",
   "minimum_chrome_version": "114",
-  "description": "GPT页面增强工具：为 ChatGPT 增加专注阅读、选择性导出、引用管理、排版与素材工具。",
-  "permissions": ["storage", "clipboardWrite"],
-  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "description": "为 ChatGPT、Gemini、Grok、DeepSeek 网页增加问题目录、专注阅读、选择性导出、引用管理和排版工具。",
+  "permissions": [
+    "storage",
+    "clipboardWrite"
+  ],
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
   "host_permissions": [
     "https://chat.openai.com/*",
     "https://chatgpt.com/*",
+    "https://gemini.google.com/*",
+    "https://grok.com/*",
+    "https://chat.deepseek.com/*",
     "https://raw.githubusercontent.com/AnDaoCc/GPT-Chat-Navigation-Bar/main/compat/chatgpt-dom-rules.json"
   ],
   "icons": {
@@ -36,10 +45,17 @@
     {
       "matches": [
         "https://chat.openai.com/*",
-        "https://chatgpt.com/*"
+        "https://chatgpt.com/*",
+        "https://gemini.google.com/*",
+        "https://grok.com/*",
+        "https://chat.deepseek.com/*"
       ],
-      "js": ["assets/contentScript.js"],
-      "css": ["assets/contentScript.css"],
+      "js": [
+        "assets/contentScript.js"
+      ],
+      "css": [
+        "assets/contentScript.css"
+      ],
       "run_at": "document_idle"
     }
   ]

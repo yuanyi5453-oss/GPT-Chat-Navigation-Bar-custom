@@ -214,6 +214,8 @@ export interface ExportSnapshot {
 }
 
 export interface PageAdapterHealth {
+  siteId?: import("./chatSites").ChatSiteId;
+  siteLabel?: string;
   status: AdapterHealthStatus;
   reason: string;
   ruleId: string;

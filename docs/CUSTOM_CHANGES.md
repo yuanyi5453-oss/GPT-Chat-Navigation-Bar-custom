@@ -1,6 +1,16 @@
 # 本地定制修改
 
-本版本为 `2026.10.4`，基于 [AnDaoCc/GPT-Chat-Navigation-Bar](https://github.com/AnDaoCc/GPT-Chat-Navigation-Bar) 的提交 `73ad3c0f3a1066463fd300e07eae9c32c686e778`。修改维护者：`yuanyi5453-oss`。
+本版本为 `2026.10.5`，基于 [AnDaoCc/GPT-Chat-Navigation-Bar](https://github.com/AnDaoCc/GPT-Chat-Navigation-Bar) 的提交 `73ad3c0f3a1066463fd300e07eae9c32c686e778`。修改维护者：`yuanyi5453-oss`。
+
+## 多站点支持
+
+新增 Gemini、Grok、DeepSeek，沿用 ChatGPT 的阅读、导出、收藏和设置界面。新增 `chatSites.ts` 维护限定域名、原生消息、输入框和容器选择器；`siteAdapters.ts` 以明确角色解析消息。公共容器 ID 不再被当作单条消息 ID，重复问题保持独立条目；流式回答保留原锚点。专注模式隐藏的消息仍保留在索引中。
+
+Gemini 的自定义元素、Grok 的消息气泡及 DeepSeek 的原生消息内容采用独立规则。DeepSeek 的 `.fbb737a4` 是会随站点构建变化的类名，需结合未来现场反馈维护。目录、代码、表格和引用不再要求外层必须有 `main` 标签。ChatGPT 的远程兼容规则只在 ChatGPT 上运行，Canvas 定位也保持 ChatGPT 范围。
+
+弹窗显示当前站点名称，导出文件前缀使用对应站点。页面状态请求即时识别当前对话，避免弹窗早于第一次后台扫描时错误地保持未连接状态。修正缺失序号属性被转换为数字 0 的问题。
+
+参考的公开 DOM 资料：[Gemini / Grok DOM Reference](https://github.com/JoonJ14/ai-conversation-navigator/blob/main/DOM-REFERENCE.md)、[Grok 气泡结构记录](https://github.com/orezeno22/ai-prompts-toc)、[DeepSeek 消息结构说明](https://github.com/NIyueeE/deepseek-user-message-renderer)。本次没有把这些第三方资料当作网站现场验证。
 
 ## 问题目录
 
@@ -32,6 +42,7 @@ TypeScript 检查、源码测试和构建均需要通过。源码测试覆盖标
 
 ## 版本记录
 
+- 2026.10.5：支持 ChatGPT、Gemini、Grok、DeepSeek；修正跨站点消息身份、容器定位、连接提示和输入框识别。
 - 2026.10.4：清理目录杂项，调整目录行排版，重做输入框定位与布局目标标记。
 - 2026.10.3：新增输入框宽度设置；后续用户反馈实际页面未生效。
 - 2026.10.2：目录普通跳转、可选专注阅读、本地短标题。

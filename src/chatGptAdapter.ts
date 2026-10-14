@@ -1,5 +1,5 @@
 export type AdapterRole = "user" | "assistant";
-export type SiteId = "chatgpt";
+export type SiteId = import("./chatSites").ChatSiteId;
 export type AdapterHealthStatus = "ok" | "degraded" | "unsupported";
 export type CompatRulesSource = "built-in" | "remote";
 
@@ -987,7 +987,7 @@ function compactSupplementalContexts(contexts: SupplementalContext[]): Supplemen
   return compacted;
 }
 
-function extractVisibleText(
+export function extractVisibleText(
   element: HTMLElement,
   rule: ChatGptDomRule,
   maxCharacters = Number.POSITIVE_INFINITY
@@ -1016,7 +1016,9 @@ function extractVisibleText(
       }
 
       const style = window.getComputedStyle(parent);
-      if (style.display === "none" || style.visibility === "hidden") {
+      const foldedByNavigator = parent.getAttribute("data-cnav-focus-hidden") === "true" &&
+        document.documentElement.dataset.cnavFocusMode === "true" && parent.style.display !== "none";
+      if ((style.display === "none" && !foldedByNavigator) || style.visibility === "hidden") {
         return NodeFilter.FILTER_REJECT;
       }
 

@@ -1,3 +1,4 @@
+import { getChatSite } from "./chatSites";
 import {
   CitationCheckResult,
   CitationRecord,
@@ -276,7 +277,7 @@ export function extractMessageCitations(
 
   for (const anchor of anchors) {
     const canonicalUrl = canonicalizeCitationUrl(anchor.href, baseUrl);
-    if (!canonicalUrl || canonicalUrl.startsWith("https://chatgpt.com/") || canonicalUrl.startsWith("https://chat.openai.com/")) {
+    if (!canonicalUrl || getChatSite(new URL(canonicalUrl).hostname)) {
       continue;
     }
     const existing = citations.get(canonicalUrl);

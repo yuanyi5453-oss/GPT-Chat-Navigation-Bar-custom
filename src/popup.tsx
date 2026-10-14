@@ -1,3 +1,4 @@
+import { getChatSite } from "./chatSites";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpen,
@@ -137,7 +138,7 @@ function getPopupExtraLabels(language: AppLanguage) {
       duplicateSaved: "Already saved",
       collectSelection: "Save selected text",
       refreshMaterials: "Refresh materials",
-      noMaterials: "Open a ChatGPT conversation and refresh materials.",
+      noMaterials: "Open a supported AI conversation and refresh materials.",
       promptKind: "Prompt",
       codeKind: "Code",
       selectionKind: "Selection",
@@ -150,8 +151,8 @@ function getPopupExtraLabels(language: AppLanguage) {
       exportFormatMarkdown: "Markdown (.md)",
       exportFormatHtml: "HTML (.html)",
       exportFormatDocx: "Word (.docx)",
-      exportNote: "Exports the current ChatGPT page only. Nothing is uploaded.",
-      noActiveChat: "No active ChatGPT tab detected.",
+      exportNote: "Exports the current AI conversation page. Nothing is uploaded.",
+      noActiveChat: "No connected AI conversation tab detected.",
       copied: "Copied",
       libraryCount: "items"
     };
@@ -183,7 +184,7 @@ function getPopupExtraLabels(language: AppLanguage) {
       duplicateSaved: "已收藏",
       collectSelection: "收藏選中文字",
       refreshMaterials: "刷新素材",
-      noMaterials: "打開 ChatGPT 對話後刷新素材。",
+      noMaterials: "打開支援的 AI 對話後刷新素材。",
       promptKind: "提示詞",
       codeKind: "代碼",
       selectionKind: "選區",
@@ -196,8 +197,8 @@ function getPopupExtraLabels(language: AppLanguage) {
       exportFormatMarkdown: "Markdown (.md)",
       exportFormatHtml: "HTML (.html)",
       exportFormatDocx: "Word (.docx)",
-      exportNote: "僅匯出目前 ChatGPT 頁面，不上傳內容。",
-      noActiveChat: "未偵測到目前 ChatGPT 分頁。",
+      exportNote: "僅匯出目前 AI 對話頁面，不上傳內容。",
+      noActiveChat: "未偵測到已連接的 AI 對話分頁。",
       copied: "已複製",
       libraryCount: "項"
     };
@@ -228,7 +229,7 @@ function getPopupExtraLabels(language: AppLanguage) {
     duplicateSaved: "已收藏",
     collectSelection: "收藏选中文本",
     refreshMaterials: "刷新素材",
-    noMaterials: "打开 ChatGPT 对话后刷新素材。",
+    noMaterials: "打开支持的 AI 对话后刷新素材。",
     promptKind: "提示词",
     codeKind: "代码",
     selectionKind: "选区",
@@ -241,8 +242,8 @@ function getPopupExtraLabels(language: AppLanguage) {
     exportFormatMarkdown: "Markdown (.md)",
     exportFormatHtml: "HTML (.html)",
     exportFormatDocx: "Word (.docx)",
-    exportNote: "仅导出当前 ChatGPT 页面，不上传内容。",
-    noActiveChat: "未检测到当前 ChatGPT 标签页。",
+    exportNote: "仅导出当前 AI 对话页面，不上传内容。",
+    noActiveChat: "未检测到已连接的 AI 对话标签页。",
     copied: "已复制",
     libraryCount: "项"
   };
@@ -250,52 +251,52 @@ function getPopupExtraLabels(language: AppLanguage) {
 
 type PopupTab = "tools" | "display" | "library" | "settings";
 
-function getModernPopupLabels(language: AppLanguage) {
+function getModernPopupLabels(language: AppLanguage, siteLabel = "AI") {
   if (language === "en") {
     return {
       tools: "Tools", display: "Display", library: "Library", settings: "Settings",
-      connected: "ChatGPT connected", disconnected: "Open a ChatGPT conversation to use page tools",
+      connected: `${siteLabel} connected`, disconnected: "Open a supported AI conversation to use page tools",
       focusTitle: "Focus reading", focusBody: "Read one question and answer without page distractions.",
       exportTitle: "Selective export", exportBody: "Choose messages, paragraphs, code, tables, and sources.",
       citationTitle: "Source manager", citationBody: "Organize, locate, copy, and check visible references.",
-      openTool: "Open", readingAppearance: "Chat typography", canvasAppearance: "Canvas typography",
+      openTool: "Open", readingAppearance: "Chat typography", canvasAppearance: "Canvas typography (ChatGPT)",
       savedLibrary: "Saved materials", pageMaterials: "Current page", general: "General",
       drawerMode: "Drawer behavior", drawerAuto: "Adaptive", drawerDock: "Always dock", drawerOverlay: "Always overlay",
       uiMotion: "Interface micro-animations", citationPermission: "Source link access",
       citationPermissionBody: "Optional access is only used when you click Check links. Requests omit cookies and do not read page bodies.",
       allowPermission: "Allow checking", revokePermission: "Revoke access", permissionDenied: "Website access was not granted", privacyTitle: "Local by default",
-      version: "2026-V10 Stable"
+      version: "2026-V11 Multi-site"
     };
   }
   if (language === "zh-TW") {
     return {
       tools: "工具", display: "顯示", library: "收藏", settings: "設定",
-      connected: "已連接 ChatGPT", disconnected: "開啟 ChatGPT 對話後可使用頁內工具",
+      connected: `已連接 ${siteLabel}`, disconnected: "開啟支援的 AI 對話後可使用頁內工具",
       focusTitle: "專注閱讀", focusBody: "一次只閱讀一輪問題與回答，暫時收起頁面干擾。",
       exportTitle: "選擇匯出", exportBody: "精確選擇訊息、段落、代碼、表格與引用。",
       citationTitle: "引用管理", citationBody: "整理、定位、複製並按需檢查可見來源。",
-      openTool: "開啟", readingAppearance: "聊天排版", canvasAppearance: "Canvas排版",
+      openTool: "開啟", readingAppearance: "聊天排版", canvasAppearance: "Canvas排版（ChatGPT）",
       savedLibrary: "已收藏素材", pageMaterials: "目前頁面", general: "一般設定",
       drawerMode: "側欄顯示方式", drawerAuto: "自動適配", drawerDock: "固定停靠", drawerOverlay: "固定覆蓋",
       uiMotion: "介面微動畫", citationPermission: "引用連結權限",
       citationPermissionBody: "僅在你點擊檢查連結時使用可選權限；請求不攜帶Cookie，也不讀取網頁正文。",
       allowPermission: "允許檢查", revokePermission: "撤銷權限", permissionDenied: "未取得網站檢查權限", privacyTitle: "預設本機處理",
-      version: "2026-V10 正式版"
+      version: "2026-V11 多站點版"
     };
   }
   return {
     tools: "工具", display: "显示", library: "收藏", settings: "设置",
-    connected: "已连接 ChatGPT", disconnected: "打开 ChatGPT 对话后可使用页内工具",
+    connected: `已连接 ${siteLabel}`, disconnected: "打开支持的 AI 对话后可使用页内工具",
     focusTitle: "专注阅读", focusBody: "一次只阅读一轮问题与回答，暂时收起页面干扰。",
     exportTitle: "选择导出", exportBody: "精确选择消息、段落、代码、表格和引用。",
     citationTitle: "引用管理", citationBody: "整理、定位、复制并按需检查可见来源。",
-    openTool: "打开", readingAppearance: "聊天排版", canvasAppearance: "Canvas排版",
+    openTool: "打开", readingAppearance: "聊天排版", canvasAppearance: "Canvas排版（ChatGPT）",
     savedLibrary: "已收藏素材", pageMaterials: "当前页面", general: "常规设置",
     drawerMode: "侧栏显示方式", drawerAuto: "自动适配", drawerDock: "固定停靠", drawerOverlay: "固定覆盖",
     uiMotion: "界面微动画", citationPermission: "引用链接权限",
     citationPermissionBody: "仅在你点击检查链接时使用可选权限；请求不携带Cookie，也不读取网页正文。",
     allowPermission: "允许检查", revokePermission: "撤销权限", permissionDenied: "未获得网站检查权限", privacyTitle: "默认本地处理",
-    version: "2026-V10 正式版"
+    version: "2026-V11 多站点版"
   };
 }
 
@@ -304,6 +305,11 @@ function normalizePopupText(value: string): string {
     .replace(/[\u200B-\u200D\uFEFF]/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function getSnapshotSiteLabel(snapshot: ExportSnapshot): string {
+  try { return getChatSite(new URL(snapshot.url).hostname)?.label ?? "AI"; }
+  catch { return "AI"; }
 }
 
 function stableHash(value: string): string {
@@ -475,7 +481,9 @@ export function downloadExportFile(filename: string, data: string | Uint8Array, 
 
 function getExportFilename(snapshot: ExportSnapshot, mode: ExportContentMode, format: ExportDocumentFormat): string {
   const source = safeFilenamePart(snapshot.title || snapshot.pageKey || "chatgpt");
-  return `chatgpt-${source}-${mode}-${formatTimestampForFilename(snapshot.exportedAt)}.${format}`;
+  let sitePrefix = "ai-chat";
+  try { sitePrefix = getChatSite(new URL(snapshot.url).hostname)?.id ?? sitePrefix; } catch {}
+  return `${sitePrefix}-${source}-${mode}-${formatTimestampForFilename(snapshot.exportedAt)}.${format}`;
 }
 
 function escapeMarkdownText(value: string): string {
@@ -571,7 +579,7 @@ function getUniqueStandaloneCodeBlocks(snapshot: ExportSnapshot): ExportCodeBloc
 }
 
 function formatChatOnlyMarkdown(snapshot: ExportSnapshot): string {
-  const lines: string[] = [`# ${snapshot.title || "ChatGPT 聊天内容"}`, ""];
+  const lines: string[] = [`# ${snapshot.title || "AI 聊天内容"}`, ""];
   const turns = organizeChatTurns(snapshot);
   const preferences = snapshot.exportPreferences;
 
@@ -606,7 +614,7 @@ function formatChatOnlyMarkdown(snapshot: ExportSnapshot): string {
 function formatFullChatMarkdown(snapshot: ExportSnapshot): string {
   const uniqueCodeBlocks = getUniqueStandaloneCodeBlocks(snapshot);
   const lines: string[] = [
-    `# ${snapshot.title || "ChatGPT conversation"}`,
+    `# ${snapshot.title || "AI conversation"}`,
     "",
     `- URL: ${snapshot.url}`,
     `- Exported: ${new Date(snapshot.exportedAt).toLocaleString()}`,
@@ -637,7 +645,7 @@ function formatFullChatMarkdown(snapshot: ExportSnapshot): string {
 
 function formatOutlineMarkdown(snapshot: ExportSnapshot): string {
   const lines: string[] = [
-    `# ${snapshot.title || "ChatGPT outline"}`,
+    `# ${snapshot.title || "AI outline"}`,
     "",
     `- URL: ${snapshot.url}`,
     `- Exported: ${new Date(snapshot.exportedAt).toLocaleString()}`,
@@ -778,14 +786,14 @@ function formatChatOnlyHtml(snapshot: ExportSnapshot): string {
     }
     if (turn.assistant) {
       body.push(`      <article class="qa-block assistant">`);
-      body.push(`        <div class="qa-role">GPT</div>`);
+      body.push(`        <div class="qa-role">${escapeHtml(getSnapshotSiteLabel(snapshot))}</div>`);
       body.push(formatHtmlTextBlock(turn.assistant).replace(/^/gm, "        "));
       body.push(`      </article>`);
     }
     body.push(`    </section>`);
   }
 
-  return formatHtmlShell(snapshot, snapshot.title || "ChatGPT 聊天内容", body.join("\n"), {
+  return formatHtmlShell(snapshot, snapshot.title || "AI 聊天内容", body.join("\n"), {
     includeMeta: Boolean(preferences?.includeSourceMeta || preferences?.includeExportedAt),
     includeSourceMeta: preferences?.includeSourceMeta,
     includeExportedAt: preferences?.includeExportedAt,
@@ -817,7 +825,7 @@ function formatFullChatHtml(snapshot: ExportSnapshot): string {
     });
   }
 
-  return formatHtmlShell(snapshot, snapshot.title || "ChatGPT conversation", body.join("\n"));
+  return formatHtmlShell(snapshot, snapshot.title || "AI conversation", body.join("\n"));
 }
 
 function formatOutlineHtml(snapshot: ExportSnapshot): string {
@@ -828,7 +836,7 @@ function formatOutlineHtml(snapshot: ExportSnapshot): string {
 
   if (snapshot.nodes.length === 0) {
     body.push(`    <p class="empty">No outline items were found.</p>`);
-    return formatHtmlShell(snapshot, snapshot.title || "ChatGPT outline", body.join("\n"));
+    return formatHtmlShell(snapshot, snapshot.title || "AI outline", body.join("\n"));
   }
 
   let currentGroup = "";
@@ -845,7 +853,7 @@ function formatOutlineHtml(snapshot: ExportSnapshot): string {
     body.push(`    </article>`);
   }
 
-  return formatHtmlShell(snapshot, snapshot.title || "ChatGPT outline", body.join("\n"));
+  return formatHtmlShell(snapshot, snapshot.title || "AI outline", body.join("\n"));
 }
 
 function escapeXml(value: string): string {
@@ -952,7 +960,7 @@ function formatChatOnlyDocxDocument(snapshot: ExportSnapshot): string {
   const turns = organizeChatTurns(snapshot);
   const preferences = snapshot.exportPreferences;
   const paragraphs: string[] = [
-    docxParagraph(snapshot.title || "ChatGPT 聊天内容", "Title")
+    docxParagraph(snapshot.title || "AI 聊天内容", "Title")
   ];
 
   if (preferences?.includeSourceMeta) paragraphs.push(docxParagraph(`URL: ${snapshot.url}`, "Meta"));
@@ -977,7 +985,7 @@ function formatChatOnlyDocxDocument(snapshot: ExportSnapshot): string {
       paragraphs.push(...docxParagraphsFromText(turn.user));
     }
     if (turn.assistant) {
-      paragraphs.push(docxParagraph("GPT", "AssistantLabel"));
+      paragraphs.push(docxParagraph(getSnapshotSiteLabel(snapshot), "AssistantLabel"));
       paragraphs.push(...docxParagraphsFromText(turn.assistant));
     }
   }
@@ -988,7 +996,7 @@ function formatChatOnlyDocxDocument(snapshot: ExportSnapshot): string {
 function formatFullChatDocxDocument(snapshot: ExportSnapshot): string {
   const uniqueCodeBlocks = getUniqueStandaloneCodeBlocks(snapshot);
   const paragraphs: string[] = [
-    docxParagraph(snapshot.title || "ChatGPT conversation", "Title"),
+    docxParagraph(snapshot.title || "AI conversation", "Title"),
     docxParagraph(`URL: ${snapshot.url}`, "Meta"),
     docxParagraph(`Exported: ${new Date(snapshot.exportedAt).toLocaleString()}`, "Meta"),
     docxParagraph("", "Normal"),
@@ -1017,7 +1025,7 @@ function formatFullChatDocxDocument(snapshot: ExportSnapshot): string {
 
 function formatOutlineDocxDocument(snapshot: ExportSnapshot): string {
   const paragraphs: string[] = [
-    docxParagraph(snapshot.title || "ChatGPT outline", "Title"),
+    docxParagraph(snapshot.title || "AI outline", "Title"),
     docxParagraph(`URL: ${snapshot.url}`, "Meta"),
     docxParagraph(`Exported: ${new Date(snapshot.exportedAt).toLocaleString()}`, "Meta"),
     docxParagraph(`Outline items: ${snapshot.nodes.length}`, "Meta"),
@@ -1416,7 +1424,6 @@ export function Popup() {
   const [settings, setSettings] = useState<NavigatorSettings>(DEFAULT_SETTINGS);
   const t = getTranslation(settings.language);
   const extra = getPopupExtraLabels(settings.language);
-  const modern = getModernPopupLabels(settings.language);
   const [activeTab, setActiveTab] = useState<PopupTab>("tools");
   const [citationPermissionGranted, setCitationPermissionGranted] = useState(false);
   const [citationPermissionPending, setCitationPermissionPending] = useState(false);
@@ -1425,6 +1432,7 @@ export function Popup() {
   const [compatRuleCount, setCompatRuleCount] = useState(0);
   const [compatMeta, setCompatMeta] = useState<StoredPopupCompatRules>({});
   const [pageHealth, setPageHealth] = useState<PageAdapterHealth | null>(null);
+  const modern = getModernPopupLabels(settings.language, pageHealth?.siteLabel);
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
   const [libraryQuery, setLibraryQuery] = useState("");
   const [materials, setMaterials] = useState<PageMaterial[]>([]);

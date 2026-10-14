@@ -61,7 +61,10 @@ import {
 import { getTranslation } from "./i18n";
 import { getThreadContentBounds } from "./threadLayout";
 import { buildQuestionTitle } from "./questionTitle";
-import { applyComposerWidth, COMPOSER_EDITOR_SELECTOR, COMPOSER_WIDTH_CSS } from "./composerLayout";
+import { applyComposerWidth, findComposerLayout, COMPOSER_EDITOR_SELECTOR, COMPOSER_WIDTH_CSS } from "./composerLayout";
+import { createSiteAdapter } from "./siteAdapters";
+import { getChatSite, getConversationRoot, getConversationId, getSiteMessageSelector, queryConversationElements } from "./chatSites";
+import { MULTI_SITE_CHAT_CSS } from "./siteLayout";
 import {
   buildConversationStorageKey,
   buildConversationSessionId,
@@ -92,7 +95,6 @@ import {
   CHATGPT_SIDEBAR_SELECTORS,
   CHATGPT_TURN_NODE_SELECTOR,
   CHATGPT_USER_MESSAGE_NODE_SELECTOR,
-  createChatGptAdapter,
   normalizeCompatRulesPayload
 } from "./chatGptAdapter";
 import {
@@ -121,7 +123,7 @@ const SCAN_DEBOUNCE_MS = 650;
 const STREAMING_SCAN_DEBOUNCE_MS = 1400;
 const IDLE_SCAN_TIMEOUT_MS = 1200;
 const CHAT_STYLE_ID = "conversation-navigator-chat-style";
-const CHAT_STYLE_VERSION = "2026-10-v10-composer-width-v4";
+const CHAT_STYLE_VERSION = "2026-10-v11-multi-site-v1";
 const TABLE_COPY_FORMAT_STORAGE_KEY = "conversationNavigator:tableCopyFormat:v1";
 const PAGE_COMMAND_EVENT = "conversation-navigator-page-command";
 const FOCUS_ACTIVE_ATTR = "data-cnav-focus-active";
@@ -280,7 +282,9 @@ function setActiveCompatRules(rules: ChatGptDomRule[], source: CompatRulesSource
 }
 
 function getAdapter(): ChatGptAdapter {
-  return createChatGptAdapter(activeCompatRules);
+  const adapter = createSiteAdapter(location.hostname, activeCompatRules);
+  if (!adapter) throw new Error("Unsupported AI chat site");
+  return adapter;
 }
 
 function detectPageTheme(): ColorTheme {
@@ -302,15 +306,7 @@ function detectPageTheme(): ColorTheme {
 }
 
 function getChatGptConversationId(): string | null {
-  const segments = location.pathname.split("/").filter(Boolean);
-  const conversationSegmentIndex = segments.findIndex((segment) => segment === "c");
-  const conversationId = conversationSegmentIndex >= 0 ? segments[conversationSegmentIndex + 1] : "";
-
-  if (conversationId && /^[a-zA-Z0-9_-]{8,}$/.test(conversationId)) {
-    return conversationId;
-  }
-
-  return null;
+  return getConversationId(location.hostname, location.pathname);
 }
 
 function createConversationSessionId(generation: number): string {
@@ -541,7 +537,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   try {
     if (message.type === PAGE_STATUS_MESSAGE) {
-      sendResponse({ ok: true, health: latestPageHealth });
+      // 弹窗可能早于首次延迟扫描打开；直接返回当前页面状态，避免永久显示未连接。
+      sendResponse({ ok: true, health: toPageAdapterHealth(getAdapter().collect().health) });
       return false;
     }
 
@@ -600,6 +597,7 @@ function installChatTypographyStyle() {
 
   style.textContent = `
     ${COMPOSER_WIDTH_CSS}
+    ${MULTI_SITE_CHAT_CSS}
 
     html[data-cnav-wide-thread="true"] main {
       --thread-content-max-width: var(--cnav-thread-width) !important;
@@ -1039,7 +1037,7 @@ function findFallbackCanvasWidthTarget(): CanvasWidthTarget | null {
     return null;
   }
 
-  const root = document.querySelector<HTMLElement>("main") ?? document.body;
+  const root = getConversationRoot() ?? document.body;
   if (!root || !isRectVisible(root.getBoundingClientRect())) {
     return null;
   }
@@ -1127,6 +1125,10 @@ function syncCanvasWidthTargets(
   settings: NavigatorSettings,
   currentSession: CanvasWidthTarget | null
 ): CanvasWidthTarget | null {
+  if (getAdapter().id !== "chatgpt") {
+    clearCanvasLayoutSession(currentSession);
+    return null;
+  }
   if (isCanvasLayoutSessionConnected(currentSession)) {
     markCanvasLayoutSession(currentSession, shouldApplyCanvasWidthLayout(settings));
     return currentSession;
@@ -1144,6 +1146,7 @@ function syncCanvasWidthTargets(
 }
 
 function getActiveCanvasWidthTarget(): CanvasWidthTarget | null {
+  if (getAdapter().id !== "chatgpt") return null;
   const layoutTarget =
     document.querySelector<HTMLElement>('[data-cnav-canvas-active-target="true"]') ??
     document.querySelector<HTMLElement>('[data-cnav-canvas-width-target="true"]');
@@ -1188,7 +1191,7 @@ function getCanvasResizeBoundsRect(target: HTMLElement, root: HTMLElement): DOMR
   }
 
   if (bestRect.width < targetRect.width + 80) {
-    const mainRect = document.querySelector<HTMLElement>("main")?.getBoundingClientRect();
+    const mainRect = getConversationRoot()?.getBoundingClientRect();
     if (mainRect && isRectVisible(mainRect) && mainRect.width > bestRect.width + 80) {
       bestRect = mainRect;
     }
@@ -1385,6 +1388,18 @@ function stableHash(value: string): string {
 }
 
 function getNativeMessageKey(element: HTMLElement): string | null {
+  if (getAdapter().id !== "chatgpt") {
+    // 公共 chat/conversation 容器不代表单条消息，不能借用它的 id。
+    const candidates = [element, element.querySelector<HTMLElement>('[data-message-id],[data-turn-id],[id^="user-query-content-"]')];
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+      for (const attribute of ["data-message-id", "data-turn-id", "id"]) {
+        const value = candidate.getAttribute(attribute)?.trim();
+        if (value) return `${attribute}:${value}`;
+      }
+    }
+    return null;
+  }
   const candidates: HTMLElement[] = [];
   const addCandidate = (candidate: HTMLElement | null) => {
     if (candidate && !candidates.includes(candidate)) {
@@ -1450,6 +1465,7 @@ function getNodeSessionAnchorId(element: HTMLElement): string {
 }
 
 function getMessageAnchorElement(element: HTMLElement): HTMLElement {
+  if (getAdapter().id !== "chatgpt") return element;
   return (
     element.closest<HTMLElement>('article[data-testid*="conversation-turn" i]') ??
     element.closest<HTMLElement>('[data-testid*="conversation-turn" i]') ??
@@ -1519,6 +1535,7 @@ function getNativeTurnOrder(element: HTMLElement): number | null {
       candidate.getAttribute("data-index"),
       candidate.getAttribute("aria-posinset")
     ]
+      .filter((value) => value !== null && value.trim() !== "")
       .map((value) => Number(value))
       .find((value) => Number.isFinite(value) && value >= 0);
 
@@ -2025,12 +2042,13 @@ function getConversationAnchorElements(): HTMLElement[] {
 }
 
 function isConversationAnchorElement(element: HTMLElement): boolean {
-  if (!document.body.contains(element) || element.closest(`#${ROOT_ID}`) || !element.closest("main")) {
+  if (!document.body.contains(element) || element.closest(`#${ROOT_ID}`) || !getConversationRoot()?.contains(element)) {
     return false;
   }
 
   return Boolean(
     element.matches(CHATGPT_TURN_OR_MARKER_SELECTOR) ||
+      element.matches(getSiteMessageSelector()) ||
       Boolean(element.querySelector(CHATGPT_MESSAGE_OR_MARKER_SELECTOR))
   );
 }
@@ -2199,7 +2217,7 @@ function getPrimaryConversationScrollContainer(): HTMLElement | Window {
     return getScrollContainer(firstAnchor);
   }
 
-  const main = document.querySelector<HTMLElement>("main");
+  const main = getConversationRoot();
   return main ? getScrollContainer(main) : window;
 }
 
@@ -2318,6 +2336,8 @@ function installRouteEvents() {
 
 function toPageAdapterHealth(health: AdapterHealth): PageAdapterHealth {
   return {
+    siteId: getAdapter().id,
+    siteLabel: getAdapter().label,
     status: health.status,
     reason: health.reason,
     ruleId: health.ruleId,
@@ -2342,7 +2362,7 @@ function getMaterialTitle(text: string, fallback: string): string {
 }
 
 function getAllReadableCodeBlocks(): HTMLPreElement[] {
-  return safeQueryAll("main pre")
+  return queryConversationElements("pre")
     .filter((element): element is HTMLPreElement => element instanceof HTMLPreElement)
     .filter((pre) => !pre.closest(`#${ROOT_ID}`))
     .filter((pre) => {
@@ -2808,7 +2828,7 @@ function dedupeCopyableTables(tables: HTMLTableElement[]): HTMLTableElement[] {
 }
 
 function findCopyableTables(): HTMLTableElement[] {
-  const candidates = safeQueryAll("main table")
+  const candidates = queryConversationElements("table")
     .filter((element): element is HTMLTableElement => element instanceof HTMLTableElement)
     .filter(isCopyableTable);
 
@@ -2929,7 +2949,7 @@ function isOfficialPopoverElement(element: HTMLElement): boolean {
     element.closest(`#${ROOT_ID}`) ||
     element === document.body ||
     element === document.documentElement ||
-    element.closest(`main ${CHATGPT_MESSAGE_OR_MARKER_SELECTOR}`)
+    element.closest(CHATGPT_MESSAGE_OR_MARKER_SELECTOR)
   ) {
     return false;
   }
@@ -4184,7 +4204,7 @@ function isCopyableCodeBlock(pre: HTMLPreElement): boolean {
 }
 
 function findCopyableCodeBlocks(): HTMLPreElement[] {
-  const candidates = safeQueryAll("main pre")
+  const candidates = queryConversationElements("pre")
     .filter((element): element is HTMLPreElement => element instanceof HTMLPreElement)
     .filter(isCopyableCodeBlock);
 
@@ -5153,7 +5173,7 @@ function ReadingToolsDrawer({
     >
       <header className="cnav-reading-header">
         <span className="cnav-reading-mark"><BookOpen size={18} aria-hidden="true" /></span>
-        <div><strong>{labels.title}</strong><small>2026-V10 · 2026.10.4</small></div>
+        <div><strong>{labels.title}</strong><small>2026-V11 · 2026.10.5</small></div>
         <button type="button" onClick={onClose} aria-label={labels.close} title={labels.close}><X size={18} aria-hidden="true" /></button>
       </header>
       <nav className="cnav-reading-tabs" aria-label={labels.title}>
@@ -5240,7 +5260,7 @@ function ReadingToolsDrawer({
                   <article className="cnav-export-message" key={message.id}>
                     <button className="cnav-export-message-toggle" type="button" onClick={() => onToggleMessage(message.id)}>
                       {allSelected ? <CheckSquare2 size={17} aria-hidden="true" /> : <Square size={17} aria-hidden="true" />}
-                      <span>{message.role === "user" ? (language === "en" ? "You" : "用户") : "GPT"}</span>
+                      <span>{message.role === "user" ? (language === "en" ? "You" : "用户") : getAdapter().label}</span>
                       <small>{messageSelectedCount}/{message.blocks.length}</small>
                     </button>
                     <div className="cnav-export-blocks">
@@ -5364,16 +5384,15 @@ function clearFocusPresentation() {
 }
 
 function markFocusChromeElements() {
+  const site = getChatSite(location.hostname)!;
   const remoteLayoutSelectors = activeCompatRules.flatMap((rule) => [
     ...(rule.layoutSelectors?.sidebar ?? []),
     ...(rule.layoutSelectors?.composer ?? []),
     ...(rule.layoutSelectors?.header ?? [])
   ]);
   const selectors = Array.from(new Set([
-    ...CHATGPT_SIDEBAR_SELECTORS,
-    ...CHATGPT_COMPOSER_SELECTORS,
-    ...CHATGPT_HEADER_SELECTORS,
-    ...remoteLayoutSelectors,
+    ...site.chrome,
+    ...(site.id === "chatgpt" ? remoteLayoutSelectors : []),
     "main form",
     '[aria-label*="composer" i]',
     '[role="banner"]',
@@ -5385,8 +5404,10 @@ function markFocusChromeElements() {
   ]));
   const candidates = Array.from(new Set(selectors.flatMap((selector) => safeQueryAll(selector))));
   for (const element of candidates) {
-    if (!element.closest(`#${ROOT_ID}`)) element.setAttribute(FOCUS_CHROME_ATTR, "true");
+    if (!element.closest(`#${ROOT_ID}`) && !element.querySelector(`[${MESSAGE_ROLE_ATTR}]`)) element.setAttribute(FOCUS_CHROME_ATTR, "true");
   }
+  const composer = findComposerLayout()?.target;
+  if (composer && !composer.closest(`[${MESSAGE_ROLE_ATTR}]`)) composer.setAttribute(FOCUS_CHROME_ATTR, "true");
 }
 
 function ConversationNavigator() {
@@ -6168,6 +6189,8 @@ function ConversationNavigator() {
     let syncWork: ScheduledIdleWork | null = null;
 
     async function loadCompatRules() {
+      // 上游远程规则只描述 ChatGPT，不能覆盖其他站点的本地适配。
+      if (adapter.id !== "chatgpt") return;
       const stored = await storageGet<StoredCompatRules>(COMPAT_RULES_STORAGE_KEY);
       if (cancelled) {
         return;
@@ -6329,15 +6352,7 @@ function ConversationNavigator() {
   }, []);
 
   const updateResizeFrame = useCallback(() => {
-    if (adapter.id !== "chatgpt") {
-      if (resizeFrameRef.current) {
-        resizeFrameRef.current = null;
-        setResizeFrame(null);
-      }
-      return;
-    }
-
-    const main = document.querySelector<HTMLElement>("main");
+    const main = getConversationRoot();
     const bounds = getThreadContentBounds(main);
     const leftBound = bounds.left;
     const rightBound = bounds.right;
@@ -6532,7 +6547,7 @@ function ConversationNavigator() {
       }
       resizeObserver?.disconnect();
       observedSession = session;
-      const main = document.querySelector<HTMLElement>("main");
+      const main = getConversationRoot();
       if (main) {
         resizeObserver?.observe(main);
       }
@@ -6752,8 +6767,8 @@ function ConversationNavigator() {
           removedConversationContent ||= Array.from(mutation.removedNodes).some((node) =>
             node instanceof HTMLElement &&
             (
-              node.matches(CHATGPT_TURN_OR_MARKER_SELECTOR) ||
-              Boolean(node.querySelector(CHATGPT_TURN_OR_MARKER_SELECTOR))
+              node.matches(`${CHATGPT_TURN_OR_MARKER_SELECTOR},${getSiteMessageSelector()}`) ||
+              Boolean(node.querySelector(`${CHATGPT_TURN_OR_MARKER_SELECTOR},${getSiteMessageSelector()}`))
             )
           );
         }
@@ -6798,7 +6813,7 @@ function ConversationNavigator() {
 
       const startX = event.clientX;
       const startWidth = getThreadWidthPixels(settingsRef.current.chatContentWidth);
-      const main = document.querySelector<HTMLElement>("main");
+      const main = getConversationRoot();
       const bounds = getThreadContentBounds(main);
       const leftBound = bounds.left;
       const rightBound = bounds.right;
@@ -7183,9 +7198,11 @@ function ConversationNavigator() {
 }
 
 function mount() {
-  if (document.getElementById(ROOT_ID)) {
+  const site = getChatSite(location.hostname);
+  if (!site || document.getElementById(ROOT_ID)) {
     return;
   }
+  document.documentElement.dataset.cnavSite = site.id;
 
   const rootElement = document.createElement("div");
   rootElement.id = ROOT_ID;

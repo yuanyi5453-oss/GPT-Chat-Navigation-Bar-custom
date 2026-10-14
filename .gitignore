@@ -8,3 +8,6 @@ validation/**/temp/
 validation/**/home/
 validation/**/appdata/
 validation/**/localappdata/
+
+.cache/
+dev-cache/

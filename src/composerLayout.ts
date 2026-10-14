@@ -1,10 +1,11 @@
 import { CHATGPT_MESSAGE_NODE_SELECTOR } from "./chatGptAdapter";
+import { ALL_NATIVE_MESSAGE_SELECTOR, ALL_COMPOSER_EDITOR_SELECTOR, getChatSite } from "./chatSites";
 
-export const COMPOSER_EDITOR_SELECTOR = '#prompt-textarea, form[data-type="unified-composer"] :is(textarea,[contenteditable="true"]), [data-testid*="composer" i] :is(textarea,[contenteditable="true"])';
+export const COMPOSER_EDITOR_SELECTOR = ALL_COMPOSER_EDITOR_SELECTOR;
 const EXCLUDED = '#conversation-navigator-root,[data-cnav-canvas-root],[data-cnav-canvas-kind],[data-testid*="canvas" i],[data-testid*="artifact" i]';
 const TARGET = "data-cnav-composer-width-target";
 const ANCESTOR = "data-cnav-composer-width-ancestor";
-const MESSAGES = `${CHATGPT_MESSAGE_NODE_SELECTOR},[data-cnav-message-role],[data-testid*="conversation-turn" i]`;
+const MESSAGES = `${CHATGPT_MESSAGE_NODE_SELECTOR},${ALL_NATIVE_MESSAGE_SELECTOR},[data-cnav-message-role],[data-testid*="conversation-turn" i]`;
 
 export const COMPOSER_WIDTH_CSS = `
   html[data-cnav-composer-width="true"] [${ANCESTOR}="true"] {
@@ -37,7 +38,9 @@ function isVisible(element: HTMLElement) {
 
 /** 从编辑器寻找可见输入框外壳，不依赖 main/form 或 Tailwind 类名。 */
 export function findComposerLayout() {
-  const editor = Array.from(document.querySelectorAll<HTMLElement>(COMPOSER_EDITOR_SELECTOR))
+  const site = getChatSite(window.location.hostname);
+  const editorSelector = site ? site.editors.join(",") : COMPOSER_EDITOR_SELECTOR;
+  const editor = Array.from(document.querySelectorAll<HTMLElement>(editorSelector))
     .find((candidate) => !candidate.closest(EXCLUDED) && !candidate.closest(MESSAGES) && isVisible(candidate));
   if (!editor) return null;
 
