@@ -194,7 +194,7 @@ try {
 } finally {
   await context.close();
   const report = {
-    version: "2026.10.5", scope: "Synthetic fixtures with full built bundles and mocked Chrome messaging; no logged-in live-site validation",
+    version: "2026.11.1", scope: "Synthetic fixtures with full built bundles and mocked Chrome messaging; no logged-in live-site validation",
     passed: results.length === sites.length, assertionCount: results.reduce((sum, result) => sum + result.checks.length, 0),
     contentScriptSha256: createHash("sha256").update(bundle).digest("hex"), results
   };

@@ -1,6 +1,25 @@
+# 导航修复版本验证记录
+
+当前版本：2026.11.1（2026-V12 导航修复版）。
+
+- TypeScript 与构建通过；源码测试 96/96 通过，其中标题抽取 26 项。
+- Chrome 导航回归 16/16 场景通过，见 `navigation/results.json`。覆盖真正的滚动位置、DOM 重挂载、有限恢复和失败提示、连续点击取消、专注阅读、390 px 窄屏、重复问题与部分虚拟窗口归属、项目内/普通聊天切换、新建聊天和浏览器前进后退。
+- 四站点完整 bundle 检查 72/72 通过，见 `multi-site/results.json`。
+- 最终 content bundle SHA-256：`0346393f637625ad6dd02ecb56b123d3e82446f4e719c00f0b487b270b9c3f9e`。
+
+修复前 2026.10.5 在专项基线 11 项中仅 5 项通过，见 `navigation/baseline-results.json`。之后根据复查新增了异步取消、部分重复窗口、回答归属及路由复用场景；最终场景总数为 16，不能把两个分母直接作百分比比较。
+
+本轮使用 Computer Use 只读观察到用户旧版 Chrome 目录有重复和标题截断。修复后的验证使用独立 D 盘浏览器 profile、人工合成聊天、模拟 Chrome API 和网络全拦截；尚未在用户真实登录对话中现场验收。不把服务器未加载的历史消息算作已经覆盖。
+
+复现：`npm run typecheck`、`npm test`、`npm run build`、`npm run test:navigation`、`npm run test:browser`。只发布合成验证报告，不发布浏览器 profile、临时缓存或真实聊天内容。
+
+以下保留原版本记录；其中旧版 `multi-site/results.json` 可在对应 GitHub 历史提交查阅，本地亦保留在 `multi-site/previous-release/`。
+
+---
+
 # 多站点版本验证记录
 
-当前版本：2026.10.5（2026-V11 多站点版）。
+版本：2026.10.5（2026-V11 多站点版）。
 
 - TypeScript `tsc --noEmit`：通过。
 - 源码测试：84/84 通过，其中 13 项新增站点适配测试。

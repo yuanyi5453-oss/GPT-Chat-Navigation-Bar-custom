@@ -1,9 +1,9 @@
 {
-  "version": "2026.10.5",
+  "version": "2026.11.1",
   "scope": "Synthetic fixtures with full built bundles and mocked Chrome messaging; no logged-in live-site validation",
   "passed": true,
   "assertionCount": 72,
-  "contentScriptSha256": "7c3ba388f744ebf82b22991b5eb8a68f18caceed4ef598ff8c04656aeccfc6f1",
+  "contentScriptSha256": "0346393f637625ad6dd02ecb56b123d3e82446f4e719c00f0b487b270b9c3f9e",
   "results": [
     {
       "site": "chatgpt",
@@ -37,7 +37,7 @@
         "userCount": 2,
         "assistantCount": 2,
         "source": "built-in",
-        "updatedAt": 1791964675646
+        "updatedAt": 1794926790194
       },
       "initialWidth": 600,
       "resizedWidth": 720,
@@ -75,7 +75,7 @@
         "userCount": 2,
         "assistantCount": 2,
         "source": "built-in",
-        "updatedAt": 1791964684788
+        "updatedAt": 1794926799337
       },
       "initialWidth": 600,
       "resizedWidth": 720,
@@ -113,7 +113,7 @@
         "userCount": 2,
         "assistantCount": 2,
         "source": "built-in",
-        "updatedAt": 1791964693852
+        "updatedAt": 1794926808475
       },
       "initialWidth": 600,
       "resizedWidth": 720,
@@ -151,7 +151,7 @@
         "userCount": 2,
         "assistantCount": 2,
         "source": "built-in",
-        "updatedAt": 1791964702967
+        "updatedAt": 1794926817605
       },
       "initialWidth": 600,
       "resizedWidth": 720,

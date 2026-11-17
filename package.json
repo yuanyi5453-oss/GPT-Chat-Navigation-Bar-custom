@@ -1,6 +1,6 @@
 {
   "name": "gpt-chat-navigator-extension",
-  "version": "2026.10.5",
+  "version": "2026.11.1",
   "private": true,
   "type": "module",
   "description": "GPT页面增强工具：本地增强 ChatGPT、Gemini、Grok、DeepSeek 专注阅读、选择性导出、引用管理、排版与素材工具。",
@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "package": "npm run build && powershell -ExecutionPolicy Bypass -File scripts/package.ps1",
-    "test:browser": "node scripts/check-multi-site.mjs"
+    "test:browser": "node scripts/check-multi-site.mjs",
+    "test:navigation": "node scripts/check-navigation.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

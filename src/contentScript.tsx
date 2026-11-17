@@ -65,11 +65,7 @@ import { applyComposerWidth, findComposerLayout, COMPOSER_EDITOR_SELECTOR, COMPO
 import { createSiteAdapter } from "./siteAdapters";
 import { getChatSite, getConversationRoot, getConversationId, getSiteMessageSelector, queryConversationElements } from "./chatSites";
 import { MULTI_SITE_CHAT_CSS } from "./siteLayout";
-import {
-  buildConversationStorageKey,
-  buildConversationSessionId,
-  hasConversationPromptOverlap
-} from "./conversationSession";
+import { buildConversationStorageKey, buildConversationSessionId } from "./conversationSession";
 import {
   CanvasLayoutSession,
   applyCanvasLayoutWidth,
@@ -192,6 +188,7 @@ interface NavigatorItem {
   turnIndex: number;
   domOrder: number;
   mounted: boolean;
+  scrollTop: number;
 }
 
 interface NavigatorGroup {
@@ -256,6 +253,21 @@ function areResizeFramesEqual(first: ResizeFrame | null, second: ResizeFrame | n
 }
 
 const anchorRegistry = new Map<string, HTMLElement>();
+let lastCollectedMessages: ParsedMessage[] = [];
+const messageRouteOwners = new WeakMap<HTMLElement, { route: string; fingerprint: string }>();
+
+function messageFingerprint(message: ParsedMessage): string {
+  return `${message.role}:${normalizeText(message.text)}`;
+}
+
+function isCurrentRouteMessage(message: ParsedMessage): boolean {
+  const owner = messageRouteOwners.get(message.element);
+  return !owner || owner.route === getConversationRouteKey() || owner.fingerprint !== messageFingerprint(message);
+}
+
+function getConversationRouteKey(): string {
+  return `${location.hostname}:${getChatGptConversationId() ?? location.pathname}`;
+}
 const nodeAnchorRegistry = new WeakMap<HTMLElement, string>();
 let nextNodeAnchorIndex = 1;
 const tabSessionId = Math.random().toString(36).slice(2, 10);
@@ -1417,9 +1429,7 @@ function getNativeMessageKey(element: HTMLElement): string | null {
   addCandidate(element.closest<HTMLElement>("[data-turn-id]"));
   addCandidate(element.closest<HTMLElement>('article[data-testid*="conversation-turn" i]'));
   addCandidate(element.closest<HTMLElement>('[data-testid*="conversation-turn" i]'));
-  addCandidate(element.closest<HTMLElement>("[data-testid]"));
-  addCandidate(element.closest<HTMLElement>("[id]"));
-
+  // 真正的消息 ID 优先于可能随渲染变化的 turn 序号。
   for (const candidate of candidates) {
     const messageId = candidate.getAttribute("data-message-id")?.trim();
     if (messageId) {
@@ -1430,14 +1440,16 @@ function getNativeMessageKey(element: HTMLElement): string | null {
     if (turnId) {
       return `data-turn-id:${turnId}`;
     }
+  }
 
+  for (const candidate of candidates) {
     const testId = candidate.getAttribute("data-testid")?.trim();
-    if (testId && /\b(message|conversation-turn|turn|canvas|artifact|document|attachment|file|image|media|picture)\b/i.test(testId)) {
+    if (testId && /(?:conversation-turn|message|turn)[-_:]?\d+\b/i.test(testId)) {
       return `data-testid:${testId}`;
     }
 
     const id = candidate.id.trim();
-    if (id && /\b(message|conversation|turn|canvas|artifact|document|attachment|file|image|media|picture)\b/i.test(id)) {
+    if (id && /(?:message|turn|canvas|artifact|document|attachment|file|image|media|picture)[-_:].+/i.test(id)) {
       return `id:${id}`;
     }
 
@@ -1466,11 +1478,14 @@ function getNodeSessionAnchorId(element: HTMLElement): string {
 
 function getMessageAnchorElement(element: HTMLElement): HTMLElement {
   if (getAdapter().id !== "chatgpt") return element;
+  const article = element.closest<HTMLElement>("article");
+  const singleMessageArticle = article && article.querySelectorAll(CHATGPT_MESSAGE_NODE_SELECTOR).length === 1 ? article : null;
   return (
     element.closest<HTMLElement>('article[data-testid*="conversation-turn" i]') ??
     element.closest<HTMLElement>('[data-testid*="conversation-turn" i]') ??
     element.closest<HTMLElement>("[data-turn-id]") ??
     element.closest<HTMLElement>("[data-message-id]") ??
+    singleMessageArticle ??
     element.closest<HTMLElement>(CHATGPT_MESSAGE_NODE_SELECTOR) ??
     element
   );
@@ -1498,7 +1513,7 @@ function getStableAnchorId(message: ParsedMessage): string {
   const anchorElement = getMessageAnchorElement(message.element);
   const nativeKey = getNativeMessageKey(anchorElement);
   if (nativeKey) {
-    const id = `cnav-msg-${stableHash(`${location.hostname}:${location.pathname}:${message.role}:${nativeKey}`)}`;
+    const id = `cnav-msg-${stableHash(`${getConversationRouteKey()}:${message.role}:${nativeKey}`)}`;
     anchorElement.setAttribute(ANCHOR_ATTR, id);
     return id;
   }
@@ -1609,7 +1624,7 @@ function summarizeAnswer(text: string): string {
 }
 
 function getNavigatorDisplayTitle(item: NavigatorItem): string {
-  return item.promptPreview;
+  return item.questionTitle;
 }
 
 function getNavigatorGroupLabel(kind: NavigatorGroupKind, language: AppLanguage): string {
@@ -1719,6 +1734,11 @@ function isContextCoveredByMessage(context: SupplementalContext, messages: Parse
 function buildNavigatorData(): BuildNavigatorResult {
   const adapter = getAdapter();
   const collection = adapter.collect();
+  collection.messages = collection.messages.filter(isCurrentRouteMessage);
+  lastCollectedMessages = collection.messages.map((message) => ({ ...message }));
+  for (const message of collection.messages) {
+    messageRouteOwners.set(message.element, { route: getConversationRouteKey(), fingerprint: messageFingerprint(message) });
+  }
   const contextMessages: ParsedMessage[] = collection.supplementalContexts
     .filter((context) => !isContextCoveredByMessage(context, collection.messages))
     .map((context) => ({
@@ -1779,7 +1799,8 @@ function buildNavigatorData(): BuildNavigatorResult {
       answerSummary: summarizeAnswer(answerParts.join("\n\n")),
       turnIndex: items.length + 1,
       domOrder,
-      mounted: true
+      mounted: true,
+      scrollTop: getElementDocumentOrder(getMessageAnchorElement(message.element))
     });
 
     mapEntries.push({
@@ -1803,21 +1824,8 @@ function buildNavigatorData(): BuildNavigatorResult {
 }
 
 function getNavigatorItemKey(item: NavigatorItem): string {
-  return stableHash(
-    [
-      normalizeText(item.promptPreview).toLowerCase(),
-      normalizeText(item.answerSummary).toLowerCase()
-    ].join("|")
-  );
-}
-
-function getMapEntryKey(entry: MessageMapEntry): string {
-  return stableHash(
-    [
-      entry.role,
-      normalizeText(entry.text).toLowerCase()
-    ].join("|")
-  );
+  // 回答会流式变化，短标题也可能相同，均不能作为问题身份。
+  return normalizeText(item.promptText);
 }
 
 function getNavigatorSortOrder(item: NavigatorItem): number {
@@ -1855,24 +1863,49 @@ function mergeNavigatorData(
   }
 
   const previousById = new Map(previousItems.map((item) => [item.id, item]));
+  const exactIds = new Set(currentItems.filter((item) => previousById.has(item.id)).map((item) => item.id));
+  let ambiguousIdentity = false;
   const usedPreviousIds = new Set<string>();
   const currentToMergedId = new Map<string, string>();
   const replacementByPreviousId = new Map<string, NavigatorItem>();
   const currentMergedItems: NavigatorItem[] = [];
   const matchedCurrentIds = new Set<string>();
 
-  const findPreviousMatch = (item: NavigatorItem): NavigatorItem | undefined => {
+  const findPreviousMatch = (item: NavigatorItem, currentIndex: number): NavigatorItem | undefined => {
     const exact = previousById.get(item.id);
     if (exact && !usedPreviousIds.has(exact.id)) {
       return exact;
     }
 
     const key = getNavigatorItemKey(item);
-    return previousItems.find((candidate) => !usedPreviousIds.has(candidate.id) && getNavigatorItemKey(candidate) === key);
+    const before = [...currentMergedItems].reverse().find((candidate) => previousById.has(candidate.id));
+    const after = currentItems.slice(currentIndex + 1).find((candidate) => exactIds.has(candidate.id));
+    const lower = before ? previousItems.findIndex((candidate) => candidate.id === before.id) : -1;
+    const upper = after ? previousItems.findIndex((candidate) => candidate.id === after.id) : previousItems.length;
+    const candidates = previousItems.filter((candidate, index) => index > lower && index < upper &&
+      !usedPreviousIds.has(candidate.id) && !exactIds.has(candidate.id) && getNavigatorItemKey(candidate) === key &&
+      (item.id.startsWith("cnav-node-") && candidate.id.startsWith("cnav-node-") || item.domOrder === candidate.domOrder));
+    if (candidates.length === 1) return candidates[0];
+    const positioned = candidates.filter((candidate) => Math.abs(candidate.scrollTop - item.scrollTop) <= 2);
+    if (positioned.length === 1) return positioned[0];
+    // 虚拟占位的 margin 折叠可产生少量偏差；只有近邻明显唯一时才接受。
+    const nearest = candidates.map((candidate) => ({ candidate, distance: Math.abs(candidate.scrollTop - item.scrollTop) }))
+      .sort((a, b) => a.distance - b.distance);
+    if (nearest[0]?.distance <= 48 && (!nearest[1] || nearest[1].distance - nearest[0].distance >= 24)) {
+      return nearest[0].candidate;
+    }
+    if (candidates.length > 1) {
+      // 整段重渲染且完整问题序列一致时，按序恢复；局部重复窗口没有证据时只显示当前可识别目录。
+      if (currentItems.length === previousItems.length && currentItems.every((current, index) => getNavigatorItemKey(current) === getNavigatorItemKey(previousItems[index]))) {
+        return previousItems[currentIndex];
+      }
+      ambiguousIdentity = true;
+    }
+    return undefined;
   };
 
-  for (const item of currentItems) {
-    const matched = findPreviousMatch(item);
+  for (const [currentIndex, item] of currentItems.entries()) {
+    const matched = findPreviousMatch(item, currentIndex);
     const mergedId = matched?.id ?? item.id;
     const currentAnchor = anchorRegistry.get(item.id);
     if (currentAnchor) {
@@ -1895,13 +1928,17 @@ function mergeNavigatorData(
     }
   }
 
+  if (ambiguousIdentity) {
+    return { items: normalizeNavigatorOrder(currentItems), mapEntries: normalizeMapEntryOrder(currentEntries) };
+  }
+
   const result = previousItems.map((item) =>
     replacementByPreviousId.get(item.id) ?? { ...item, mounted: false }
   );
 
   const currentScrollTop = getCurrentConversationScrollTop();
   const insertFreshItem = (item: NavigatorItem, currentIndex: number) => {
-    if (result.some((existing) => existing.id === item.id || getNavigatorItemKey(existing) === getNavigatorItemKey(item))) {
+    if (result.some((existing) => existing.id === item.id)) {
       return;
     }
 
@@ -1939,9 +1976,18 @@ function mergeNavigatorData(
     }
   });
 
+  const mergedItems = normalizeNavigatorOrder(result);
+  const previousTurnIndices = new Map(previousItems.map((item) => [item.turnIndex,
+    mergedItems.find((merged) => merged.id === item.id)?.turnIndex ?? item.turnIndex]));
+  const turnIndices = new Map(currentItems.map((item) => [item.turnIndex,
+    mergedItems.find((merged) => merged.id === currentToMergedId.get(item.id))!.turnIndex]));
   return {
-    items: normalizeNavigatorOrder(result),
-    mapEntries: normalizeMapEntryOrder(mergeMapEntries(previousEntries, currentEntries, currentToMergedId))
+    items: mergedItems,
+    mapEntries: normalizeMapEntryOrder(mergeMapEntries(previousEntries.map((entry) => ({
+      ...entry, turnIndex: previousTurnIndices.get(entry.turnIndex) ?? entry.turnIndex
+    })), currentEntries.map((entry) => ({
+      ...entry, turnIndex: turnIndices.get(entry.turnIndex) ?? entry.turnIndex
+    })), currentToMergedId))
   };
 }
 
@@ -1967,8 +2013,12 @@ function mergeMapEntries(
       id,
       mounted: true
     };
-    const existingIndex = result.findIndex(
-      (candidate) => candidate.id === id || getMapEntryKey(candidate) === getMapEntryKey(nextEntry)
+    const exactIndex = result.findIndex((candidate) => candidate.id === id);
+    const existingIndex = exactIndex >= 0 ? exactIndex : result.findIndex(
+      (candidate) => candidate.role === entry.role &&
+        candidate.turnIndex === entry.turnIndex && !candidate.mounted &&
+        candidate.id.startsWith("cnav-node-") && entry.id.startsWith("cnav-node-") &&
+        !currentEntries.some((current) => (currentToMergedId.get(current.id) ?? current.id) === candidate.id)
     );
 
     if (existingIndex >= 0) {
@@ -2026,6 +2076,27 @@ function scrollAnchorToTop(element: HTMLElement, animate: boolean) {
   const top = Math.max(0, scrollElement.scrollTop + rect.top - containerRect.top - 18);
   scrollElementTo(scrollElement, top, animate);
   verifyJump(element, scrollContainer, animate ? 360 : 80);
+}
+
+function resolveQuestionAnchor(item: NavigatorItem): HTMLElement | null {
+  const messages = getAdapter().collect().messages.filter((message) => message.role === "user" && isCurrentRouteMessage(message));
+  const matches = messages.filter((message) => normalizeText(message.text) === normalizeText(item.promptText));
+  const exact = matches.find((message) => getStableAnchorId(message) === item.id);
+  const cached = anchorRegistry.get(item.id);
+  const mounted = matches.find((message) => getMessageAnchorElement(message.element) === cached);
+  // 匿名消息由扫描时的完整序列合并恢复；局部出现次序不能证明是同一轮。
+  const match = exact ?? mounted;
+  if (!match) return null;
+  const anchor = getMessageAnchorElement(match.element);
+  anchorRegistry.set(item.id, anchor);
+  return anchor;
+}
+
+function isQuestionTopVisible(element: HTMLElement): boolean {
+  if (!element.isConnected || !element.getClientRects().length) return false;
+  const rect = element.getBoundingClientRect();
+  const viewport = getContainerViewportRect(getScrollContainer(element));
+  return rect.top >= Math.max(0, viewport.top) - 2 && rect.top < viewport.bottom - 32;
 }
 
 function getConversationAnchorElements(): HTMLElement[] {
@@ -2164,7 +2235,8 @@ function isScrollableElement(element: HTMLElement): boolean {
 }
 
 function getScrollContainer(element: HTMLElement): HTMLElement | Window {
-  let current: HTMLElement | null = element;
+  // 问题气泡本身可能是滚动框；导航要移动外部对话，而不是气泡内部。
+  let current: HTMLElement | null = element.parentElement;
   while (current && current !== document.body && current !== document.documentElement) {
     if (isScrollableElement(current)) {
       return current;
@@ -2218,7 +2290,7 @@ function getPrimaryConversationScrollContainer(): HTMLElement | Window {
   }
 
   const main = getConversationRoot();
-  return main ? getScrollContainer(main) : window;
+  return main ? isScrollableElement(main) ? main : getScrollContainer(main) : window;
 }
 
 function getCurrentConversationScrollTop(): number {
@@ -2307,31 +2379,6 @@ function flashAnchor(element: HTMLElement) {
     element.style.outlineOffset = previousOutlineOffset;
     element.style.transition = previousTransition;
   }, 1300);
-}
-
-function installRouteEvents() {
-  const marker = "__conversationNavigatorRouteEventsInstalled";
-  const win = window as unknown as Window & Record<string, boolean>;
-  if (win[marker]) {
-    return;
-  }
-
-  win[marker] = true;
-  const notify = () => window.dispatchEvent(new Event("conversation-navigator-route-change"));
-  const originalPushState = history.pushState;
-  const originalReplaceState = history.replaceState;
-
-  history.pushState = function pushState(...args) {
-    const result = originalPushState.apply(this, args);
-    notify();
-    return result;
-  };
-
-  history.replaceState = function replaceState(...args) {
-    const result = originalReplaceState.apply(this, args);
-    notify();
-    return result;
-  };
 }
 
 function toPageAdapterHealth(health: AdapterHealth): PageAdapterHealth {
@@ -5059,6 +5106,7 @@ interface ReadingToolsDrawerProps {
   focusMode: boolean;
   activeTurnIndex: number;
   readingProgress: number;
+  navigationStatus: string;
   citationsChecking: boolean;
   exportPreferences: SelectiveExportPreferences;
   onClose: () => void;
@@ -5090,6 +5138,7 @@ function ReadingToolsDrawer({
   focusMode,
   activeTurnIndex,
   readingProgress,
+  navigationStatus,
   citationsChecking,
   exportPreferences,
   onClose,
@@ -5173,7 +5222,7 @@ function ReadingToolsDrawer({
     >
       <header className="cnav-reading-header">
         <span className="cnav-reading-mark"><BookOpen size={18} aria-hidden="true" /></span>
-        <div><strong>{labels.title}</strong><small>2026-V11 · 2026.10.5</small></div>
+        <div><strong>{labels.title}</strong><small>2026-V12 · 2026.11.1</small></div>
         <button type="button" onClick={onClose} aria-label={labels.close} title={labels.close}><X size={18} aria-hidden="true" /></button>
       </header>
       <nav className="cnav-reading-tabs" aria-label={labels.title}>
@@ -5221,6 +5270,7 @@ function ReadingToolsDrawer({
               </>
             ) : null}
             </details>
+            {navigationStatus ? <p className="cnav-navigation-status" role="status">{navigationStatus}</p> : null}
             <div className="cnav-turn-list">
               {items.length === 0 ? <p className="cnav-tool-empty">{labels.noContent}</p> : items.map((item, index) => (
                 <button
@@ -5439,6 +5489,7 @@ function ConversationNavigator() {
   const [focusMode, setFocusMode] = useState(false);
   const [activeFocusTurn, setActiveFocusTurn] = useState(0);
   const [readingProgress, setReadingProgress] = useState(0);
+  const [navigationStatus, setNavigationStatus] = useState("");
   const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
   const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set());
   const [exportPreferences, setExportPreferences] = useState<SelectiveExportPreferences>(
@@ -5466,6 +5517,9 @@ function ConversationNavigator() {
   const focusPresentedTurnRef = useRef<number | null>(null);
   const focusScrollFrameRef = useRef(0);
   const questionNavigationFrameRef = useRef(0);
+  const questionNavigationRequestRef = useRef(0);
+  const routeKeyRef = useRef(getConversationRouteKey());
+  const routeConversationIdRef = useRef(getChatGptConversationId());
   const readingSnapshotCacheRef = useRef<ReadingMessageParseCache>(new Map());
   const citationStateRef = useRef(citationState);
   const citationRequestGenerationRef = useRef(0);
@@ -5551,6 +5605,7 @@ function ConversationNavigator() {
     focusPresentedTurnRef.current = null;
     window.cancelAnimationFrame(focusScrollFrameRef.current);
     window.cancelAnimationFrame(questionNavigationFrameRef.current);
+    questionNavigationRequestRef.current += 1;
     cancelNavigationAnimation();
     readingSnapshotCacheRef.current.clear();
     citationRequestGenerationRef.current += 1;
@@ -5558,6 +5613,8 @@ function ConversationNavigator() {
     clearFocusPresentation();
     setFocusMode(false);
     setReadingProgress(0);
+    setActiveFocusTurn(0);
+    setNavigationStatus("");
     setCitationState({});
     setCitationsChecking(false);
     setSelectionTouched(false);
@@ -5567,22 +5624,36 @@ function ConversationNavigator() {
     setPageId(nextSessionId);
   }, []);
 
+  const syncConversationRoute = useCallback(() => {
+    const nextKey = getConversationRouteKey();
+    if (nextKey === routeKeyRef.current) return false;
+    const nextConversationId = getChatGptConversationId();
+    const draftBecameConversation = routeConversationIdRef.current === null && nextConversationId !== null;
+    routeKeyRef.current = nextKey;
+    routeConversationIdRef.current = nextConversationId;
+    // URL 先变化、旧 DOM 后消失时，不能把过渡期间的旧消息登记到新会话。
+    if (draftBecameConversation) {
+      for (const message of lastCollectedMessages) {
+        messageRouteOwners.set(message.element, { route: nextKey, fingerprint: messageFingerprint(message) });
+      }
+    }
+    lastCollectedMessages = [];
+    resetConversationState();
+    return true;
+  }, [resetConversationState]);
+
   const scan = useCallback(() => {
     if (scanRunningRef.current) {
       scanQueuedRef.current = true;
       return;
     }
 
+    syncConversationRoute();
     const scanSessionId = sessionIdRef.current;
     scanRunningRef.current = true;
     try {
       const { items: nextItems, mapEntries: nextMapEntries, health: nextHealth } = buildNavigatorData();
       if (scanSessionId !== sessionIdRef.current) {
-        return;
-      }
-
-      if (nextMapEntries.length === 0 && mapEntriesRef.current.length > 0) {
-        resetConversationState();
         return;
       }
 
@@ -5624,7 +5695,7 @@ function ConversationNavigator() {
         }, SCAN_DEBOUNCE_MS);
       }
     }
-  }, []);
+  }, [syncConversationRoute]);
 
   const scheduleScan = useCallback((delay = SCAN_DEBOUNCE_MS) => {
     if (scanTimerRef.current) {
@@ -5660,10 +5731,14 @@ function ConversationNavigator() {
   const updateSettings = commitSettingsPatch;
 
   const navigateToQuestion = (nextIndex: number) => {
+    if (syncConversationRoute()) { scheduleScan(0); return; }
     if (items.length === 0) return;
     const index = Math.min(items.length - 1, Math.max(0, nextIndex));
-    const itemId = items[index].id;
+    const item = items[index];
     const sessionId = sessionIdRef.current;
+    const routeKey = getConversationRouteKey();
+    const request = ++questionNavigationRequestRef.current;
+    const isCurrent = () => request === questionNavigationRequestRef.current && sessionId === sessionIdRef.current && routeKey === getConversationRouteKey();
     if (focusMode) focusScrollPositionsRef.current.set(activeFocusTurn, getCurrentConversationScrollTop());
     window.cancelAnimationFrame(focusScrollFrameRef.current);
     window.cancelAnimationFrame(questionNavigationFrameRef.current);
@@ -5672,21 +5747,60 @@ function ConversationNavigator() {
     focusPresentedTurnRef.current = null;
     clearFocusPresentation();
     setActiveFocusTurn(index);
-    setDrawerOpen(true);
+    // 浮层会遮住聊天；窄屏和覆盖模式下点击即收起，停靠目录保留。
+    setDrawerOpen(drawerDocked);
     setActiveToolPanel("focus");
-    questionNavigationFrameRef.current = window.requestAnimationFrame(() => {
+    setNavigationStatus(settings.language === "en" ? "Locating question…" : settings.language === "zh-TW" ? "正在定位問題…" : "正在定位问题…");
+    questionNavigationFrameRef.current = window.requestAnimationFrame(async () => {
       questionNavigationFrameRef.current = 0;
-      if (sessionId !== sessionIdRef.current) return;
-      const anchor = anchorRegistry.get(itemId);
-      if (!anchor?.isConnected) return;
-      const animate = settings.navigateAnimationEnabled && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      scrollAnchorToTop(anchor, animate);
-      flashAnchor(anchor);
+      const pause = (delay: number) => new Promise<void>((resolve) => window.setTimeout(resolve, delay));
+      try {
+        for (let attempt = 0; attempt < 12 && isCurrent(); attempt += 1) {
+          if (attempt > 0) scan();
+          if (!isCurrent()) return;
+          const anchor = resolveQuestionAnchor(item);
+          if (anchor) {
+            const animate = attempt === 0 && settings.navigateAnimationEnabled && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            scrollAnchorToTop(anchor, animate);
+            await pause(animate ? 480 : 100);
+            if (!isCurrent()) return;
+            const currentAnchor = resolveQuestionAnchor(item);
+            if (currentAnchor && isQuestionTopVisible(currentAnchor)) {
+              flashAnchor(currentAnchor);
+              setNavigationStatus("");
+              scheduleScan(0);
+              return;
+            }
+            if (currentAnchor) scrollElementIntoView(currentAnchor, false);
+          } else {
+            // 页面只渲染邻近消息时，先回到已知位置，再逐屏触发有限次数的挂载。
+            const container = getPrimaryConversationScrollContainer();
+            const visible = itemsRef.current.filter((candidate) => anchorRegistry.get(candidate.id)?.isConnected);
+            const closest = [...visible].sort((a, b) => Math.abs(a.turnIndex - item.turnIndex) - Math.abs(b.turnIndex - item.turnIndex))[0];
+            const direction = closest ? Math.sign(item.turnIndex - closest.turnIndex) || -1 : -1;
+            const position = attempt === 0 ? item.scrollTop - 92 : getContainerScrollTop(container) + direction * getContainerClientHeight(container) * 0.8;
+            const top = Math.max(0, Math.min(position, getContainerScrollHeight(container) - getContainerClientHeight(container)));
+            if (container === window) scrollWindowTo(top, false);
+            else scrollElementTo(container as HTMLElement, top, false);
+            await pause(140);
+          }
+        }
+      } catch (error) {
+        console.warn("[GPT页面增强工具] 问题定位失败", error);
+      }
+      if (isCurrent()) {
+        setNavigationStatus(settings.language === "en"
+          ? "This question is not available on the page yet. Scroll to load earlier messages, then try again."
+          : settings.language === "zh-TW" ? "暫時無法定位這個問題，請捲動載入較早的訊息後重試。" : "暂时无法定位这个问题，请滚动加载较早的消息后重试。");
+        setDrawerOpen(true);
+      }
     });
   };
 
   const setFocusTurn = (nextIndex: number) => {
     if (items.length === 0) return;
+    questionNavigationRequestRef.current += 1;
+    setNavigationStatus("");
     window.cancelAnimationFrame(questionNavigationFrameRef.current);
     cancelNavigationAnimation();
     if (focusMode) focusScrollPositionsRef.current.set(activeFocusTurn, getCurrentConversationScrollTop());
@@ -5698,6 +5812,8 @@ function ConversationNavigator() {
   };
 
   const toggleFocusMode = () => {
+    questionNavigationRequestRef.current += 1;
+    setNavigationStatus("");
     window.cancelAnimationFrame(questionNavigationFrameRef.current);
     window.cancelAnimationFrame(focusScrollFrameRef.current);
     cancelNavigationAnimation();
@@ -6002,6 +6118,7 @@ function ConversationNavigator() {
 
   useEffect(() => () => {
     clearFocusPresentation();
+    questionNavigationRequestRef.current += 1;
     window.cancelAnimationFrame(focusScrollFrameRef.current);
     window.cancelAnimationFrame(questionNavigationFrameRef.current);
     cancelNavigationAnimation();
@@ -6132,57 +6249,27 @@ function ConversationNavigator() {
   }, [officialPopoverOpen]);
 
   useEffect(() => {
-    installRouteEvents();
-    let lastHref = location.href;
-    let routeCheckTimer = 0;
-
     const handleRouteChange = () => {
-      const hrefChanged = location.href !== lastHref;
-      lastHref = location.href;
-      if (hrefChanged) {
-        resetConversationState();
-        scheduleScan(50);
-        return;
-      }
-
-      if (routeCheckTimer) {
-        window.clearTimeout(routeCheckTimer);
-      }
-      routeCheckTimer = window.setTimeout(() => {
-        routeCheckTimer = 0;
-        if (mapEntriesRef.current.length === 0) {
-          return;
-        }
-
-        const currentPromptPreviews = new Set(
-          getAdapter().collect().messages
-            .filter((message) => message.role === "user")
-            .map((message) => compactPreview(message.text, 112))
-        );
-        const hasPromptOverlap = hasConversationPromptOverlap(
-          itemsRef.current.map((item) => item.promptPreview),
-          currentPromptPreviews
-        );
-        if (!hasPromptOverlap) {
-          resetConversationState();
-          scheduleScan(50);
-        }
-      }, 80);
+      if (syncConversationRoute()) scheduleScan(0);
     };
-
+    // Content scripts 的 isolated world 不能可靠拦截页面的 history 方法。
+    // Navigation API 提供即时信号；旧浏览器、后台恢复和 SPA 用 URL 检查兜底。
+    const navigation = (window as Window & { navigation?: EventTarget }).navigation;
+    navigation?.addEventListener("currententrychange", handleRouteChange);
+    const routeTimer = window.setInterval(handleRouteChange, 200);
     window.addEventListener("popstate", handleRouteChange);
     window.addEventListener("hashchange", handleRouteChange);
-    window.addEventListener("conversation-navigator-route-change", handleRouteChange);
-
+    window.addEventListener("pageshow", handleRouteChange);
+    document.addEventListener("visibilitychange", handleRouteChange);
     return () => {
-      if (routeCheckTimer) {
-        window.clearTimeout(routeCheckTimer);
-      }
+      window.clearInterval(routeTimer);
+      navigation?.removeEventListener("currententrychange", handleRouteChange);
       window.removeEventListener("popstate", handleRouteChange);
       window.removeEventListener("hashchange", handleRouteChange);
-      window.removeEventListener("conversation-navigator-route-change", handleRouteChange);
+      window.removeEventListener("pageshow", handleRouteChange);
+      document.removeEventListener("visibilitychange", handleRouteChange);
     };
-  }, [resetConversationState, scheduleScan]);
+  }, [syncConversationRoute, scheduleScan]);
 
   useEffect(() => {
     let cancelled = false;
@@ -6751,9 +6838,9 @@ function ConversationNavigator() {
     };
 
     const observer = new MutationObserver((mutations) => {
+      const routeChanged = syncConversationRoute();
       let hasRelevantMutation = false;
       let textOnly = true;
-      let removedConversationContent = false;
 
       for (const mutation of mutations) {
         const element = getMutationElement(mutation);
@@ -6764,13 +6851,6 @@ function ConversationNavigator() {
         hasRelevantMutation = true;
         if (mutation.type !== "characterData") {
           textOnly = false;
-          removedConversationContent ||= Array.from(mutation.removedNodes).some((node) =>
-            node instanceof HTMLElement &&
-            (
-              node.matches(`${CHATGPT_TURN_OR_MARKER_SELECTOR},${getSiteMessageSelector()}`) ||
-              Boolean(node.querySelector(`${CHATGPT_TURN_OR_MARKER_SELECTOR},${getSiteMessageSelector()}`))
-            )
-          );
         }
       }
 
@@ -6778,16 +6858,7 @@ function ConversationNavigator() {
         return;
       }
 
-      if (
-        removedConversationContent &&
-        mapEntriesRef.current.length > 0 &&
-        getAdapter().collect().messages.length === 0
-      ) {
-        resetConversationState();
-        return;
-      }
-
-      scheduleScan(textOnly ? STREAMING_SCAN_DEBOUNCE_MS : SCAN_DEBOUNCE_MS);
+      scheduleScan(routeChanged ? 0 : textOnly ? STREAMING_SCAN_DEBOUNCE_MS : SCAN_DEBOUNCE_MS);
     });
 
     observer.observe(document.body, {
@@ -6799,7 +6870,7 @@ function ConversationNavigator() {
     return () => {
       observer.disconnect();
     };
-  }, [resetConversationState, scheduleScan]);
+  }, [syncConversationRoute, scheduleScan]);
 
 
   const showCanvasHandles = Boolean(canvasResizeFrame && (settings.canvasWidthEnabled || canvasResizingSide));
@@ -7060,6 +7131,7 @@ function ConversationNavigator() {
         focusMode={focusMode}
         activeTurnIndex={activeFocusTurn}
         readingProgress={readingProgress}
+        navigationStatus={navigationStatus}
         citationsChecking={citationsChecking}
         exportPreferences={exportPreferences}
         onClose={() => setDrawerOpen(false)}

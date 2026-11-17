@@ -265,7 +265,7 @@ function getModernPopupLabels(language: AppLanguage, siteLabel = "AI") {
       uiMotion: "Interface micro-animations", citationPermission: "Source link access",
       citationPermissionBody: "Optional access is only used when you click Check links. Requests omit cookies and do not read page bodies.",
       allowPermission: "Allow checking", revokePermission: "Revoke access", permissionDenied: "Website access was not granted", privacyTitle: "Local by default",
-      version: "2026-V11 Multi-site"
+      version: "2026-V12 Navigation"
     };
   }
   if (language === "zh-TW") {
@@ -281,7 +281,7 @@ function getModernPopupLabels(language: AppLanguage, siteLabel = "AI") {
       uiMotion: "介面微動畫", citationPermission: "引用連結權限",
       citationPermissionBody: "僅在你點擊檢查連結時使用可選權限；請求不攜帶Cookie，也不讀取網頁正文。",
       allowPermission: "允許檢查", revokePermission: "撤銷權限", permissionDenied: "未取得網站檢查權限", privacyTitle: "預設本機處理",
-      version: "2026-V11 多站點版"
+      version: "2026-V12 導航修復版"
     };
   }
   return {
@@ -296,7 +296,7 @@ function getModernPopupLabels(language: AppLanguage, siteLabel = "AI") {
     uiMotion: "界面微动画", citationPermission: "引用链接权限",
     citationPermissionBody: "仅在你点击检查链接时使用可选权限；请求不携带Cookie，也不读取网页正文。",
     allowPermission: "允许检查", revokePermission: "撤销权限", permissionDenied: "未获得网站检查权限", privacyTitle: "默认本地处理",
-    version: "2026-V11 多站点版"
+    version: "2026-V12 导航修复版"
   };
 }
 

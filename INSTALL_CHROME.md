@@ -20,7 +20,7 @@ chrome://extensions
 extension/
 ```
 
-5. 确认扩展版本为 `2026.10.5`，然后打开或刷新 ChatGPT、Gemini、Grok、DeepSeek 中的一段对话。
+5. 确认扩展版本为 `2026.11.1`，然后打开或刷新 ChatGPT、Gemini、Grok、DeepSeek 中的一段对话。
 
 已有安装更新时，将新 `extension/` 内文件更新到原加载目录，在扩展管理页点击“重新加载”，然后刷新已打开的对话页面。Chrome 如提示新增网站访问权限，应允许需要使用的 Gemini、Grok、DeepSeek 站点。
 

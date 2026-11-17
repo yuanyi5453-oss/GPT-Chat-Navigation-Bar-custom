@@ -1,0 +1,290 @@
+{
+  "scope": "合成 ChatGPT 页面、完整构建 bundle、模拟 Chrome API、全部网络拦截。使用独立 D 盘 Chrome profile，未接入账号或真实聊天。",
+  "bundleSha256": "7c3ba388f744ebf82b22991b5eb8a68f18caceed4ef598ff8c04656aeccfc6f1",
+  "passed": false,
+  "passedCount": 5,
+  "scenarioCount": 11,
+  "results": [
+    {
+      "name": "document scrolling",
+      "passed": true,
+      "errors": [],
+      "before": {
+        "present": true,
+        "top": 3977.5625,
+        "bottom": 4040.359375,
+        "viewportTop": 0,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "after": {
+        "present": true,
+        "top": 91.5625,
+        "bottom": 154.359375,
+        "viewportTop": 0,
+        "viewportBottom": 900,
+        "scrollTop": 3886,
+        "internalScrollTop": 0,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      }
+    },
+    {
+      "name": "nested overflow scrolling",
+      "passed": true,
+      "errors": [],
+      "before": {
+        "present": true,
+        "top": 3977.5625,
+        "bottom": 4040.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "after": {
+        "present": true,
+        "top": 81.5625,
+        "bottom": 144.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 3896,
+        "internalScrollTop": 0,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      }
+    },
+    {
+      "name": "long scrollable question",
+      "passed": true,
+      "errors": [],
+      "before": {
+        "present": true,
+        "top": 3977.5625,
+        "bottom": 4187.5625,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "after": {
+        "present": true,
+        "top": 376.5625,
+        "bottom": 586.5625,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 3601,
+        "internalScrollTop": 0,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      }
+    },
+    {
+      "name": "immediate DOM replacement",
+      "passed": false,
+      "errors": [],
+      "before": {
+        "present": true,
+        "top": 3977.5625,
+        "bottom": 4040.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "error": "page.waitForFunction: Timeout 7000ms exceeded.",
+      "after": {
+        "present": true,
+        "top": 3977.5625,
+        "bottom": 4040.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      }
+    },
+    {
+      "name": "temporarily unmounted question",
+      "passed": false,
+      "errors": [],
+      "before": {
+        "present": true,
+        "top": 3977.5625,
+        "bottom": 4040.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "error": "page.waitForFunction: Timeout 7000ms exceeded.",
+      "after": {
+        "present": false,
+        "top": null,
+        "bottom": null,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": null,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      }
+    },
+    {
+      "name": "missing question feedback",
+      "passed": false,
+      "errors": [],
+      "before": {
+        "present": true,
+        "top": 3977.5625,
+        "bottom": 4040.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "error": "page.waitForFunction: Timeout 10000ms exceeded.",
+      "after": {
+        "present": false,
+        "top": null,
+        "bottom": null,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": null,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      }
+    },
+    {
+      "name": "rapid clicks keep last target",
+      "passed": true,
+      "errors": [],
+      "before": {
+        "present": true,
+        "top": 3977.5625,
+        "bottom": 4040.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "after": {
+        "present": true,
+        "top": 81.5625,
+        "bottom": 144.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 3896,
+        "internalScrollTop": 0,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      }
+    },
+    {
+      "name": "exit focus before navigation",
+      "passed": true,
+      "errors": [],
+      "before": {
+        "present": true,
+        "top": 3977.5625,
+        "bottom": 4040.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "after": {
+        "present": true,
+        "top": 81.5625,
+        "bottom": 144.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 3896,
+        "internalScrollTop": 0,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      }
+    },
+    {
+      "name": "390px mobile closes drawer",
+      "passed": false,
+      "errors": [],
+      "before": {
+        "present": true,
+        "top": 3977.5625,
+        "bottom": 4040.359375,
+        "viewportTop": 64,
+        "viewportBottom": 844,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "after": {
+        "present": true,
+        "top": 81.5625,
+        "bottom": 144.359375,
+        "viewportTop": 64,
+        "viewportBottom": 844,
+        "scrollTop": 3896,
+        "internalScrollTop": 0,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "error": "mobile navigation closes the overlay drawer\n\ntrue !== false\n"
+    },
+    {
+      "name": "anonymous repeated prompts survive remount and streaming",
+      "passed": false,
+      "questionCount": 13,
+      "error": "same-content remount and answer streaming must not duplicate a question\n\n13 !== 12\n"
+    },
+    {
+      "name": "SPA route changes clear stale conversation",
+      "passed": false,
+      "transitions": [],
+      "error": "page.waitForFunction: Timeout 1200ms exceeded.",
+      "url": "https://chatgpt.com/g/g-p-synthetic-project/c/project-conversation",
+      "directory": [
+        "第 1问题 1，请解释材料计算结果第 2问题 2，请解释材料计算结果第 3问题 3，请解释材料计算结果第 4问题 4，请解释材料计算结果第 5问题 5，请解释材料计算结果第 6问题 6，请解释材料计算结果第 7问题 7，请解释材料计算结果第 8问题 8，请解释材料计算结果第 9问题 9，请解释材料计算结果第 10问题 10，请解释材料计算结果第 11问题 11，请解释材料计算结果第 12问题 12，请解释材料计算结果"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,584 @@
+{
+  "scope": "合成 ChatGPT 页面、完整构建 bundle、模拟 Chrome API、全部网络拦截。使用独立 D 盘 Chrome profile，未接入账号或真实聊天。",
+  "bundleSha256": "0346393f637625ad6dd02ecb56b123d3e82446f4e719c00f0b487b270b9c3f9e",
+  "passed": true,
+  "passedCount": 16,
+  "scenarioCount": 16,
+  "results": [
+    {
+      "name": "document scrolling",
+      "passed": true,
+      "errors": [],
+      "before": {
+        "present": true,
+        "top": 3977.5625,
+        "bottom": 4040.359375,
+        "viewportTop": 0,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 3977.5625,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "after": {
+        "present": true,
+        "top": 91.5625,
+        "bottom": 154.359375,
+        "viewportTop": 0,
+        "viewportBottom": 900,
+        "scrollTop": 3886,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 3977.5625,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      }
+    },
+    {
+      "name": "nested overflow scrolling",
+      "passed": true,
+      "errors": [],
+      "before": {
+        "present": true,
+        "top": 3977.5625,
+        "bottom": 4040.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 3913.5625,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "after": {
+        "present": true,
+        "top": 81.5625,
+        "bottom": 144.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 3896,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 3913.5625,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      }
+    },
+    {
+      "name": "long scrollable question",
+      "passed": true,
+      "errors": [],
+      "before": {
+        "present": true,
+        "top": 3977.5625,
+        "bottom": 4187.5625,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 3913.5625,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "after": {
+        "present": true,
+        "top": 81.5625,
+        "bottom": 291.5625,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 3896,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 3913.5625,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      }
+    },
+    {
+      "name": "immediate DOM replacement",
+      "passed": true,
+      "errors": [],
+      "before": {
+        "present": true,
+        "top": 3977.5625,
+        "bottom": 4040.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 3913.5625,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "after": {
+        "present": true,
+        "top": 81.5625,
+        "bottom": 144.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 3896,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 3913.5625,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      }
+    },
+    {
+      "name": "temporarily unmounted question",
+      "passed": true,
+      "errors": [],
+      "before": {
+        "present": true,
+        "top": 3977.5625,
+        "bottom": 4040.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 3913.5625,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "after": {
+        "present": true,
+        "top": 81.5625,
+        "bottom": 144.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 3896,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 3913.5625,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 1
+      }
+    },
+    {
+      "name": "missing question feedback",
+      "passed": true,
+      "errors": [],
+      "before": {
+        "present": true,
+        "top": 3977.5625,
+        "bottom": 4040.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 3913.5625,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "feedback": [
+        "暂时无法定位这个问题，请滚动加载较早的消息后重试。"
+      ]
+    },
+    {
+      "name": "rapid clicks keep last target",
+      "passed": true,
+      "errors": [],
+      "before": {
+        "present": true,
+        "top": 3977.5625,
+        "bottom": 4040.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 3913.5625,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "after": {
+        "present": true,
+        "top": 81.5625,
+        "bottom": 144.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 3896,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 3913.5625,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      }
+    },
+    {
+      "name": "later click cancels missing-target recovery",
+      "passed": true,
+      "errors": [],
+      "before": {
+        "present": true,
+        "top": 3977.5625,
+        "bottom": 4040.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 3913.5625,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "after": {
+        "present": true,
+        "top": 82.1875,
+        "bottom": 144.984375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 1313,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 1331.1875,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      }
+    },
+    {
+      "name": "exit focus before navigation",
+      "passed": true,
+      "errors": [],
+      "before": {
+        "present": true,
+        "top": 3977.5625,
+        "bottom": 4040.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 3913.5625,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "after": {
+        "present": true,
+        "top": 81.5625,
+        "bottom": 144.359375,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 3896,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 3913.5625,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      }
+    },
+    {
+      "name": "390px mobile closes drawer",
+      "passed": true,
+      "errors": [],
+      "before": {
+        "present": true,
+        "top": 3977.5625,
+        "bottom": 4040.359375,
+        "viewportTop": 64,
+        "viewportBottom": 844,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 3913.5625,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "after": {
+        "present": true,
+        "top": 81.5625,
+        "bottom": 144.359375,
+        "viewportTop": 64,
+        "viewportBottom": 844,
+        "scrollTop": 3896,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 3913.5625,
+        "focus": null,
+        "drawerOpen": false,
+        "virtualMounts": 0
+      }
+    },
+    {
+      "name": "anonymous repeated prompts survive remount and streaming",
+      "passed": true,
+      "questionCount": 12
+    },
+    {
+      "name": "repeated prompt ownership after first round unmount",
+      "passed": true,
+      "beforeNodes": [
+        {
+          "id": "cnav-node-1",
+          "title": "分析",
+          "promptPreview": "相同问题，请分析",
+          "answerSummary": "A 第1轮原始回答 合成回答占位",
+          "groupLabel": "常规对话",
+          "turnIndex": 1
+        },
+        {
+          "id": "cnav-node-3",
+          "title": "分析",
+          "promptPreview": "相同问题，请分析",
+          "answerSummary": "A 第2轮原始回答 合成回答占位",
+          "groupLabel": "常规对话",
+          "turnIndex": 2
+        }
+      ],
+      "secondBeforeUnmount": {
+        "present": true,
+        "top": 1169.59375,
+        "bottom": 1232.390625,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 1105.59375,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "afterNodes": [
+        {
+          "id": "cnav-node-1",
+          "title": "分析",
+          "promptPreview": "相同问题，请分析",
+          "answerSummary": "A 第1轮原始回答 合成回答占位",
+          "groupLabel": "常规对话",
+          "turnIndex": 1
+        },
+        {
+          "id": "cnav-node-3",
+          "title": "分析",
+          "promptPreview": "相同问题，请分析",
+          "answerSummary": "A 第2轮原始回答 合成回答占位 第二轮追加回答专属标记",
+          "groupLabel": "常规对话",
+          "turnIndex": 2
+        }
+      ],
+      "secondAfterScan": {
+        "present": true,
+        "top": 1189.59375,
+        "bottom": 1252.390625,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 1125.59375,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "secondQuestion": {
+        "present": true,
+        "top": 81.59375,
+        "bottom": 144.390625,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 1108,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 1125.59375,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "firstQuestionFeedback": [
+        "暂时无法定位这个问题，请滚动加载较早的消息后重试。"
+      ]
+    },
+    {
+      "name": "partial window preserves earlier answer ownership",
+      "passed": true,
+      "beforeNodes": [
+        {
+          "id": "cnav-node-1",
+          "title": "A 第1轮问题",
+          "promptPreview": "A 第1轮问题",
+          "answerSummary": "A 第1轮原始回答 合成回答占位",
+          "groupLabel": "常规对话",
+          "turnIndex": 1
+        },
+        {
+          "id": "cnav-node-3",
+          "title": "A 第2轮问题",
+          "promptPreview": "A 第2轮问题",
+          "answerSummary": "A 第2轮原始回答 合成回答占位",
+          "groupLabel": "常规对话",
+          "turnIndex": 2
+        }
+      ],
+      "secondBeforeUnmount": {
+        "present": true,
+        "top": 1169.59375,
+        "bottom": 1232.390625,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 1105.59375,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "afterNodes": [
+        {
+          "id": "cnav-node-1",
+          "title": "A 第1轮问题",
+          "promptPreview": "A 第1轮问题",
+          "answerSummary": "A 第1轮原始回答 合成回答占位",
+          "groupLabel": "常规对话",
+          "turnIndex": 1
+        },
+        {
+          "id": "cnav-node-3",
+          "title": "A 第2轮问题",
+          "promptPreview": "A 第2轮问题",
+          "answerSummary": "A 第2轮原始回答 合成回答占位 第二轮追加回答专属标记",
+          "groupLabel": "常规对话",
+          "turnIndex": 2
+        }
+      ],
+      "secondAfterScan": {
+        "present": true,
+        "top": 1189.59375,
+        "bottom": 1252.390625,
+        "viewportTop": 64,
+        "viewportBottom": 900,
+        "scrollTop": 0,
+        "internalScrollTop": 0,
+        "conversationOffsetTop": 1125.59375,
+        "focus": null,
+        "drawerOpen": true,
+        "virtualMounts": 0
+      },
+      "focusTurn": "1 / 2",
+      "secondAnswerInFirstFocus": {
+        "articleHeight": 0,
+        "articleHidden": "true",
+        "contentHeight": 0,
+        "contentDisplay": "block",
+        "contentHidden": null
+      }
+    },
+    {
+      "name": "new chat root URL adopts conversation without DOM change",
+      "passed": true,
+      "beforeNodes": [
+        {
+          "id": "cnav-msg-1gjio3b",
+          "title": "A 第1轮问题",
+          "promptPreview": "A 第1轮问题",
+          "answerSummary": "A 第1轮原始回答 合成回答占位",
+          "groupLabel": "常规对话",
+          "turnIndex": 1
+        },
+        {
+          "id": "cnav-msg-1gjio38",
+          "title": "A 第2轮问题",
+          "promptPreview": "A 第2轮问题",
+          "answerSummary": "A 第2轮原始回答 合成回答占位",
+          "groupLabel": "常规对话",
+          "turnIndex": 2
+        }
+      ],
+      "afterNodes": [
+        {
+          "id": "cnav-msg-1gcl0x9",
+          "title": "A 第1轮问题",
+          "promptPreview": "A 第1轮问题",
+          "answerSummary": "A 第1轮原始回答 合成回答占位",
+          "groupLabel": "常规对话",
+          "turnIndex": 1
+        },
+        {
+          "id": "cnav-msg-1gcl0xa",
+          "title": "A 第2轮问题",
+          "promptPreview": "A 第2轮问题",
+          "answerSummary": "A 第2轮原始回答 合成回答占位",
+          "groupLabel": "常规对话",
+          "turnIndex": 2
+        }
+      ]
+    },
+    {
+      "name": "returning route reuses original conversation DOM",
+      "passed": true,
+      "beforeNodes": [
+        {
+          "id": "cnav-msg-plvwqf",
+          "title": "A 第1轮问题",
+          "promptPreview": "A 第1轮问题",
+          "answerSummary": "A 第1轮原始回答 合成回答占位",
+          "groupLabel": "常规对话",
+          "turnIndex": 1
+        },
+        {
+          "id": "cnav-msg-plvwqc",
+          "title": "A 第2轮问题",
+          "promptPreview": "A 第2轮问题",
+          "answerSummary": "A 第2轮原始回答 合成回答占位",
+          "groupLabel": "常规对话",
+          "turnIndex": 2
+        }
+      ],
+      "afterNodes": [
+        {
+          "id": "cnav-msg-plvwqf",
+          "title": "A 第1轮问题",
+          "promptPreview": "A 第1轮问题",
+          "answerSummary": "A 第1轮原始回答 合成回答占位",
+          "groupLabel": "常规对话",
+          "turnIndex": 1
+        },
+        {
+          "id": "cnav-msg-plvwqc",
+          "title": "A 第2轮问题",
+          "promptPreview": "A 第2轮问题",
+          "answerSummary": "A 第2轮原始回答 合成回答占位",
+          "groupLabel": "常规对话",
+          "turnIndex": 2
+        }
+      ]
+    },
+    {
+      "name": "SPA route changes clear stale conversation",
+      "passed": true,
+      "transitions": [
+        {
+          "route": "/g/g-p-synthetic-project/c/project-conversation",
+          "via": "push",
+          "title": "项目会话新问题",
+          "oldDirectoryClearedBeforeDomChange": true,
+          "newDirectoryQuestionCount": 1
+        },
+        {
+          "route": "/c/another-conversation",
+          "via": "push",
+          "title": "普通会话新问题",
+          "oldDirectoryClearedBeforeDomChange": true,
+          "newDirectoryQuestionCount": 1
+        },
+        {
+          "route": "/g/g-p-synthetic-project/c/project-conversation",
+          "via": "back",
+          "title": "返回项目会话问题",
+          "oldDirectoryClearedBeforeDomChange": true,
+          "newDirectoryQuestionCount": 1
+        },
+        {
+          "route": "/c/another-conversation",
+          "via": "forward",
+          "title": "前进普通会话问题",
+          "oldDirectoryClearedBeforeDomChange": true,
+          "newDirectoryQuestionCount": 1
+        }
+      ]
+    }
+  ]
+}

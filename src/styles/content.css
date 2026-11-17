@@ -1097,6 +1097,15 @@ html[data-cnav-focus-mode="true"] #conversation-navigator-root :is(.cnav-table-c
 #conversation-navigator-root .cnav-focus-options .cnav-focus-navigation { margin-top: 10px; }
 
 #conversation-navigator-root .cnav-turn-list { display: grid; gap: 6px; flex: 1; align-content: start; }
+#conversation-navigator-root .cnav-navigation-status {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--cnav-panel-accent-soft);
+  color: var(--cnav-panel-text);
+  font-size: 12px;
+  line-height: 1.5;
+}
 #conversation-navigator-root .cnav-turn-list > button {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
